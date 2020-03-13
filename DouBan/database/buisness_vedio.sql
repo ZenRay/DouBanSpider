@@ -54,7 +54,7 @@ CREATE TABLE `video_actor` (
 -- ----------------------------
 DROP TABLE IF EXISTS `video_character`;
 CREATE TABLE `video_character` (
-  `id` bigint NOT NULL,
+  `id` bigint NOT NULL AUTO_INCREMENT,
   `video_id` bigint DEFAULT NULL COMMENT '电影基本信息外键id',
   `sorting` int DEFAULT NULL COMMENT '排序',
   `name` varchar(255) DEFAULT NULL COMMENT '演员名',
@@ -70,7 +70,7 @@ CREATE TABLE `video_character` (
 -- ----------------------------
 DROP TABLE IF EXISTS `video_director`;
 CREATE TABLE `video_director` (
-  `id` bigint NOT NULL,
+  `id` bigint NOT NULL AUTO_INCREMENT,
   `video_id` bigint DEFAULT NULL COMMENT '电影基本信息外键id',
   `name` varchar(255) DEFAULT NULL COMMENT '导演名字',
   `name_jane` varchar(100) DEFAULT NULL COMMENT '导演名字简称拼音首字母',
@@ -101,11 +101,11 @@ CREATE TABLE `video_extension_region` (
 -- ----------------------------
 DROP TABLE IF EXISTS `video_review`;
 CREATE TABLE `video_review` (
-  `id` int NOT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
   `video_id` bigint DEFAULT NULL COMMENT '电影基本信息外键id',
   `sorting` int DEFAULT NULL COMMENT '排序（楼数）',
   `review_time` varchar(20) DEFAULT NULL COMMENT '点评时间(YYYY-MM-dd HH:mm:ss)',
-  `score` double(2,2) DEFAULT NULL COMMENT '评分',
+  `score` double DEFAULT NULL COMMENT '评分',
   `content` text COMMENT '评论内容',
   PRIMARY KEY (`id`),
   KEY `video_id` (`video_id`),

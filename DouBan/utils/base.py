@@ -19,7 +19,7 @@ from .exceptions import (
 )
 
 
-__all__ = ["BaseSQLPipeline", , "BaseSpider"]
+__all__ = ["BaseSQLPipeline" , "BaseSpider"]
 
 class BaseSQLPipeline(object):
     """Generate table config
