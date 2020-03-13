@@ -78,6 +78,7 @@ class DoubanStoragePipeline(BaseSQLPipeline):
                 
                 self.log(f"Insert data at {query_step} success", level=logging.INFO)
             except Exception as err:
+                self.error_file_store.write(json.dumps(dict(item, "query_step"=query_step), ensure_ascii=False), + "\n")
                 self.log(f"Insert value error: {data}, because {err}, At insert step {query_step}", \
                         level=logging.ERROR)
         
