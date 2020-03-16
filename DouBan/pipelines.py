@@ -69,16 +69,18 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         def insert(sentence, data, query_step=None, single_query=True):
             """Insert Data Into Table"""
             try:
+                # insert a single data
                 if single_query:
                     self.db_cursor.execute(sentence, data)
                     self.db_connection.commit()
+                # insert many data with executemany method
                 else:
                     self.db_cursor.executemany(sentence, data)
                     self.db_connection.commit()
                 
                 self.log(f"Insert data at {query_step} success", level=logging.INFO)
             except Exception as err:
-                self.error_file_store.write(json.dumps(dict(item, "query_step"=query_step), ensure_ascii=False), + "\n")
+                self.error_file_store.write(json.dumps(dict(item, query_step=query_step), ensure_ascii=False)+ "\n")
                 self.log(f"Insert value error: {data}, because {err}, At insert step {query_step}", \
                         level=logging.ERROR)
         
@@ -86,9 +88,6 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         # if item is not DoubanDataItem object, just return item
         if not isinstance(item, DoubanDataItem):
             return item
-        
-        # TODO: 写入所有数据到 file
-        self.file.write(json.dumps(dict(item), ensure_ascii=False)+"\n")
 
         # use the item key as redis key, and check the data id exists
         redis_key = item.__class__.__name__
@@ -96,6 +95,9 @@ class DoubanStoragePipeline(BaseSQLPipeline):
             raise DropItem(f"Duplicated DataItem {item['id']}-{item['title']}")
         else:
             self.redis_pool.sadd(redis_key, item["id"])
+
+        # TODO: 写入所有数据到 file
+        self.file.write(json.dumps(dict(item), ensure_ascii=False)+"\n")    
 
         # store video data into table, and query id
         try:

@@ -4,8 +4,9 @@ import scrapy
 import requests
 import json
 import ssl
-
+import logging
 import sys
+import re
 
 from pyquery import PyQuery
 from lxml import etree
@@ -14,40 +15,43 @@ from DouBan.items import CoverImageItem, DoubanDataItem
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
 
+
+
+logger = logging.getLogger(__name__)
+
 class DoubanSpider(scrapy.Spider):
     name = 'douban'
     # allowed_domains = ['douban.com', "movie.douban.com/"]
     # start_urls = ['https://movie.douban.com/j/search_subjects?type=movie&tag=%E7%BB%8F%E5%85%B8&sort=recommend&page_limit=20&page_start=0']
     # url = 'http://movie.douban.com/j/search_subjects?type=movie&tag=%E7%83%AD%E9%97%A8&sort=recommend&page_limit=20&page_start=' + "0"
 
-    tags = ["热门", "最新", "经典", "可播放", "豆瓣高分", "冷门佳片", \
+    tags = list(reversed(["热门", "最新", "经典", "可播放", "豆瓣高分", "冷门佳片", \
             "华语", "欧美", "韩国", "日本", "动作", "喜剧", "爱情", "科幻", "悬疑", \
-                "恐怖", "文艺"]
-    _start_url = "http://movie.douban.com/j/search_subjects?type=movie&tag={tag}&sort=recommend&page_limit=20&page_start={start}"
+                "恐怖", "文艺"]))
+    page_ends = list(reversed([360, 495, 491, 223, 495, 495, 230, 255, 115, 220, 200, 200, 200, \
+                112, 152, 123, 491]))
+    _start_url = "http://movie.douban.com/j/search_subjects?type=movie&tag={tag}&sort=recommend&page_limit=20&page_start="
 
 
     def start_requests(self):
         # TODO: ===== 下面的代码是请求部分代码，暂时进行注释
-        for tag in self.tags:
-            start = 0
-            while True:
-                tag = parse.quote(tag)
-                start *= 20
-                url = self._start_url.format(tag=tag, start=start)
-                
-                yield scrapy.Request(url, callback=self.item_page)
-                break
-            break
-                # response = requests.get(url, headers=HEADERS)
-                
+        for index, tag in enumerate(self.tags):
+            # start = 0
+            start = 0 #self.page_ends[index]
+            tag = parse.quote(tag)
+            url = self._start_url.format(tag=tag)
+            while start < self.page_ends[index]:
+                logger.critical(f"URL: {url+str(start)}")
+
+                yield scrapy.Request(url+str(start), callback=self.item_page)
                 # TODO: next page
-                # start += 1
-
-
-        # yield scrapy.Request(self.url, callback=self.parse)
+                start += 1
 
 
     def parse(self, response):
+        # from scrapy.shell import inspect_response
+        # inspect_response(response, self)
+
         item = DoubanDataItem()
         item["cover_page"] = response.meta["cover_page"]
         item["url"] = response.url
@@ -66,7 +70,14 @@ class DoubanSpider(scrapy.Spider):
         item["category"] = "/".join(response.xpath("//span[@property='v:genre']/text()").extract())
         item["play_location"] = "/".join(response.xpath("//span[@property='v:initialReleaseDate']/text()").re("\((.*)\)"))
         item["play_year"] = "/".join(response.xpath("//span[@property='v:initialReleaseDate']/text()").re("(.*)\("))
-        item["play_duration"] = response.xpath("//span[@property='v:runtime']/text()").extract_first()
+        play_duration = response.xpath("//span[@property='v:runtime']/text()").re(".+分钟")
+        # parse play_duration time, if None set 0
+        if play_duration is None:
+            item["play_duration"] = '0'
+        elif len(play_duration) == 1:
+            item["play_duration"] = play_duration[0]
+        else:
+            logger.warning(f"播放时间解析错误: {play_duration}")
 
         item["nick_name"] = self.check(tree, "又名")
         item["product_country"] = self.check(tree, "制片国家/地区")
@@ -146,11 +157,6 @@ class DoubanSpider(scrapy.Spider):
         item["tags"] = response.css("div.tags-body > a::text").extract()
 
         yield item
-        # print(json.loads(response.text))
-        # from scrapy.shell import inspect_response
-        # inspect_response(response, self)
-
-        pass
     
 
     def item_page(self, response):
@@ -160,12 +166,13 @@ class DoubanSpider(scrapy.Spider):
         
         data = json.loads(response.text)["subjects"]
         item = CoverImageItem()
+
         for page_item in data:
             item["name"] = page_item["title"]
             item["id"] = page_item["id"]
             item["url"] = page_item["cover"]
             # pass the item to download cover
-            yield item
+            # yield item
 
             # crawl detailed page
             meta = response.meta.copy()
@@ -174,7 +181,6 @@ class DoubanSpider(scrapy.Spider):
                         "cover_page": page_item["cover"]})
 
             yield scrapy.Request(page_item["url"], callback=self.parse, meta=meta)
-            break
 
 
     def check(self, tree, target:str):
