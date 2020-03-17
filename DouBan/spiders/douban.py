@@ -31,7 +31,7 @@ class DoubanSpider(scrapy.Spider):
     tags = list(reversed(["热门", "最新", "经典", "可播放", "豆瓣高分", "冷门佳片", \
             "华语", "欧美", "韩国", "日本", "动作", "喜剧", "爱情", "科幻", "悬疑", \
                 "恐怖", "文艺"]))
-    page_ends = list(reversed([360, 495, 491, 223, 495, 495, 230, 255, 115, 220, 200, 200, 200, \
+    page_ends = list(reversed([360, 480, 480, 220, 500, 500, 230, 255, 115, 220, 200, 200, 200, \
                 112, 152, 123, 491]))
     _start_url = "http://movie.douban.com/j/search_subjects?type=movie&tag={tag}&sort=recommend&page_limit=20&page_start="
 
@@ -52,9 +52,9 @@ class DoubanSpider(scrapy.Spider):
             url = self._start_url.format(tag=tag)
             while start < self.page_ends[index]:
                 logger.critical(f"URL: {url+str(start)}")
+                yield scrapy.Request(url+str(start * 20), callback=self.item_page)
                 # TODO: next page
-                start += 20 * index
-                yield scrapy.Request(url+str(start), callback=self.item_page)
+                start += 1
                 
 
     def parse(self, response):
@@ -64,7 +64,8 @@ class DoubanSpider(scrapy.Spider):
         item = DoubanDataItem()
         item["cover_page"] = response.meta["cover_page"]
         item["url"] = response.url
-        item["title"] = response.css('h1 > span::text').extract_first()
+        # item["title"] = response.css('h1 > span::text').extract_first()
+        item["title"] = response.meta["title"]
         item["release_year"] = response.css('h1 > span::text')[1].re("\d+")[0]
         item["rate"] = response.meta["rate"]
         item["id"] = response.meta["id"]
@@ -187,7 +188,8 @@ class DoubanSpider(scrapy.Spider):
             meta = response.meta.copy()
             meta.update({"rate": page_item["rate"], 
                         "id": page_item["id"],
-                        "cover_page": page_item["cover"]})
+                        "cover_page": page_item["cover"],
+                        "title": page_item["title"]})
 
             if not self.redis_connect.sismember(self.redis_key, item["id"]):
                 yield scrapy.Request(page_item["url"], callback=self.parse, meta=meta)
