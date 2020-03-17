@@ -7,6 +7,7 @@ import ssl
 import logging
 import sys
 import re
+import redis
 
 from pyquery import PyQuery
 from lxml import etree
@@ -14,10 +15,12 @@ from urllib import parse
 from DouBan.items import CoverImageItem, DoubanDataItem
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
+from DouBan.settings import DATABASE_CONF
 
-
+from DouBan.utils.exceptions import ConnectionError
 
 logger = logging.getLogger(__name__)
+
 
 class DoubanSpider(scrapy.Spider):
     name = 'douban'
@@ -32,9 +35,16 @@ class DoubanSpider(scrapy.Spider):
                 112, 152, 123, 491]))
     _start_url = "http://movie.douban.com/j/search_subjects?type=movie&tag={tag}&sort=recommend&page_limit=20&page_start="
 
+    # connect redis database
+    redis_connect = redis.StrictRedis(connection_pool=redis.ConnectionPool(
+        **DATABASE_CONF["redis"]))
+    # check the connection status
+    if not redis_connect.ping():
+        raise ConnectionError("Can't connect the redis server. Checkout" + 
+                            " network and config parameters.")
+    redis_key = DoubanDataItem.__name__
 
     def start_requests(self):
-        # TODO: ===== 下面的代码是请求部分代码，暂时进行注释
         for index, tag in enumerate(self.tags):
             # start = 0
             start = 0 #self.page_ends[index]
@@ -46,7 +56,7 @@ class DoubanSpider(scrapy.Spider):
                 yield scrapy.Request(url+str(start), callback=self.item_page)
                 # TODO: next page
                 start += 1
-
+                
 
     def parse(self, response):
         # from scrapy.shell import inspect_response
@@ -180,7 +190,10 @@ class DoubanSpider(scrapy.Spider):
                         "id": page_item["id"],
                         "cover_page": page_item["cover"]})
 
-            yield scrapy.Request(page_item["url"], callback=self.parse, meta=meta)
+            if not self.redis_connect.sismember(self.redis_key, item["id"]):
+                yield scrapy.Request(page_item["url"], callback=self.parse, meta=meta)
+            else:
+                logger.info(f"{item['id']} Crawled")
 
 
     def check(self, tree, target:str):

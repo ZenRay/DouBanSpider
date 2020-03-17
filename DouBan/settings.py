@@ -22,7 +22,7 @@ NEWSPIDER_MODULE = 'DouBan.spiders'
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-#CONCURRENT_REQUESTS = 32
+CONCURRENT_REQUESTS = 2
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
@@ -53,16 +53,18 @@ DEFAULT_REQUEST_HEADERS = {
 
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
-#SPIDER_MIDDLEWARES = {
+# SPIDER_MIDDLEWARES = {
 #    'DouBan.middlewares.DoubanSpiderMiddleware': 543,
-#}
+# }
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
-#DOWNLOADER_MIDDLEWARES = {
-#    'DouBan.middlewares.DoubanDownloaderMiddleware': 543,
-#}
-
+DOWNLOADER_MIDDLEWARES = {
+    'DouBan.middlewares.UserAgentDownloaderMiddleware': 2,
+    # 'DouBan.middlewares.ProxyDownloaderMiddleware': 555,
+    # 'DouBan.middlewares.DoubanDownloaderMiddleware': 543,
+   
+}
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
 #EXTENSIONS = {
@@ -99,10 +101,10 @@ AUTOTHROTTLE_ENABLED = True
 
 # Log config
 from os import path
-LOG_ENABLED = True
-LOG_ENCODING = "utf8"
-LOG_LEVEL = "INFO"
-LOG_FILE = path.join(path.dirname(__file__), "log/douban.log")
+# LOG_ENABLED = True
+# LOG_ENCODING = "utf8"
+# LOG_LEVEL = "INFO"
+# LOG_FILE = path.join(path.dirname(__file__), "log/douban.log")
 
 
 # DataBase configuration
