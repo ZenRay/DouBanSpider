@@ -52,10 +52,9 @@ class DoubanSpider(scrapy.Spider):
             url = self._start_url.format(tag=tag)
             while start < self.page_ends[index]:
                 logger.critical(f"URL: {url+str(start)}")
-
-                yield scrapy.Request(url+str(start), callback=self.item_page)
                 # TODO: next page
-                start += 1
+                start += 20 * index
+                yield scrapy.Request(url+str(start), callback=self.item_page)
                 
 
     def parse(self, response):
@@ -108,11 +107,6 @@ class DoubanSpider(scrapy.Spider):
         item["introduction"] = "\n".join(i.strip() for i in response.css("div#link-report > span::text").extract())
 
         # worker info
-        # data = {}
-        # for name, role in zip(response.css("#celebrities > ul > li > div > span > a::text").extract(), 
-        #     response.css("#celebrities > ul > li > div > span::text").extract()):
-        #     data[name] = role
-        # item["worker_detail"] = json.dumps(data)
         actor_name = response.css("#celebrities > ul > li > div > span > a::text").extract()
         actor_role = response.css("#celebrities > ul > li > div > span::text").extract()
         actor_iamge = response.css("#celebrities > ul > li > a > div.avatar::attr(style)").re(r"url\((.+)\)")
@@ -176,6 +170,11 @@ class DoubanSpider(scrapy.Spider):
         
         data = json.loads(response.text)["subjects"]
         item = CoverImageItem()
+
+        # if there is not data, return None
+        if len(data) == 0:
+            tag = parse.parse_qs(response.url)["tag"]
+            logger.critical(f"{tag} crawled Done")
 
         for page_item in data:
             item["name"] = page_item["title"]
