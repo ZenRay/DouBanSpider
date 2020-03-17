@@ -50,8 +50,8 @@ class DoubanSpider(scrapy.Spider):
             start = 0 #self.page_ends[index]
             tag = parse.quote(tag)
             url = self._start_url.format(tag=tag)
-            while start < self.page_ends[index]:
-                logger.critical(f"URL: {url+str(start)}")
+            while start * 20 < self.page_ends[index]:
+                logger.critical(f"URL: {url+str(start*20)}")
                 yield scrapy.Request(url+str(start * 20), callback=self.item_page)
                 # TODO: next page
                 start += 1
