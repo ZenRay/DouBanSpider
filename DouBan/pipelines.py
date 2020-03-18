@@ -99,6 +99,9 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         # TODO: 写入所有数据到 file
         self.file.write(json.dumps(dict(item), ensure_ascii=False)+"\n")    
 
+        # reconnect the database
+        self.db_connection.ping(reconnect=True)
+
         # store video data into table, and query id
         try:
             video_sent = self.insert_sentence("video", self.schema["video"].keys())
@@ -110,7 +113,7 @@ class DoubanStoragePipeline(BaseSQLPipeline):
                                     (item['title'], item['rate']))
             item["video_id"] = self.db_cursor.fetchone()[0]
         except Exception as err:
-            self.error_file_store.write(json.dumps(dict(item), ensure_ascii=False), + "\n")
+            self.error_file_store.write(json.dumps(dict(item), ensure_ascii=False) + "\n")
             self.log(f"Insert value error: {item}, because {err}",level=logging.ERROR)
             raise DropItem(f"Insert value error: {item}, because {err}")
 
@@ -166,7 +169,7 @@ class DoubanStoragePipeline(BaseSQLPipeline):
             extension_region_data.append((item["video_id"], region, \
                             item["release_year"], time_, item["play_duration"], 0))
         insert(extension_region_sent, extension_region_data, \
-            query_step="extention_region", single_query=False)
+            query_step="video_extention_region", single_query=False)
 
         # store role information into table
         character_role_sent = self.insert_sentence("video_character", \
@@ -186,7 +189,7 @@ class DoubanStoragePipeline(BaseSQLPipeline):
             # character_role_data.append((item["video_id"], index, name, role, url))
 
         insert(character_role_sent, character_role_data, \
-            query_step="video_extension_region", single_query=False)
+            query_step="video_character", single_query=False)
 
         return item
 

@@ -101,10 +101,10 @@ AUTOTHROTTLE_ENABLED = True
 
 # Log config
 from os import path
-# LOG_ENABLED = True
-# LOG_ENCODING = "utf8"
-# LOG_LEVEL = "INFO"
-# LOG_FILE = path.join(path.dirname(__file__), "log/douban.log")
+LOG_ENABLED = True
+LOG_ENCODING = "utf8"
+LOG_LEVEL = "INFO"
+LOG_FILE = path.join(path.dirname(__file__), "log/douban.log")
 
 
 # DataBase configuration
