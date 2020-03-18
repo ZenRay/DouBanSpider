@@ -30,9 +30,9 @@ class DoubanSpider(scrapy.Spider):
 
     tags = list(reversed(["热门", "最新", "经典", "可播放", "豆瓣高分", "冷门佳片", \
             "华语", "欧美", "韩国", "日本", "动作", "喜剧", "爱情", "科幻", "悬疑", \
-                "恐怖", "文艺"]))
+                "恐怖", "文艺"]))[1:]
     page_ends = list(reversed([360, 480, 480, 220, 500, 500, 230, 255, 115, 220, 200, 200, 200, \
-                112, 152, 123, 491]))
+                112, 152, 123, 491]))[1:]
     _start_url = "http://movie.douban.com/j/search_subjects?type=movie&tag={tag}&sort=recommend&page_limit=20&page_start="
 
     # connect redis database
