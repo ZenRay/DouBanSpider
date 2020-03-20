@@ -4,7 +4,7 @@ import requests
 import json
 
 from os import path
-
+import time
 from ._settings import payload, headers, redis_conf
 from ..exceptions import InappropriateArgument
 
@@ -47,6 +47,11 @@ def generate_cookie(name, passwd, url=None, target="douban"):
         if response.json()["status"] == "success":
             cookies = session.cookies.get_dict()
             return cookies
+        elif response.json()["status"] == "failed":
+            while response.json()["status"] == "failed" and response.json()["message"] == "captcha_required":
+                time.sleep(300)
+                response = session.post(url, data=payload, headers=headers)
+                return cookies
         else:
             raise ConnectionError("Can't login web")
 
