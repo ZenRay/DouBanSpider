@@ -7,7 +7,9 @@
 import random
 import logging
 from scrapy import signals
+from DouBan.utils.login import *
 
+from scrapy.downloadermiddlewares.retry import RetryMiddleware
 
 class DoubanSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
@@ -134,3 +136,10 @@ class UserAgentDownloaderMiddleware(object):
         ua = random.choice(self.user_agents)
         self.logger.debug('使用User-Agent ' + ua)
         request.headers['User-Agent'] = ua
+
+
+class CookiesRetryDownloaderMidddleware(RetryMiddleware):
+    def process_request(self, request, spider):
+        cookies = random.choice(list(douban_cookie()))
+        request.cookies = cookies
+        # return request

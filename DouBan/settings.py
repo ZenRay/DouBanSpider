@@ -61,6 +61,7 @@ DEFAULT_REQUEST_HEADERS = {
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
     'DouBan.middlewares.UserAgentDownloaderMiddleware': 2,
+    "DouBan.middlewares.CookiesRetryDownloaderMidddleware": 100
     # 'DouBan.middlewares.ProxyDownloaderMiddleware': 555,
     # 'DouBan.middlewares.DoubanDownloaderMiddleware': 543,
    

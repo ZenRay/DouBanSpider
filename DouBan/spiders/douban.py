@@ -28,12 +28,16 @@ class DoubanSpider(scrapy.Spider):
     # start_urls = ['https://movie.douban.com/j/search_subjects?type=movie&tag=%E7%BB%8F%E5%85%B8&sort=recommend&page_limit=20&page_start=0']
     # url = 'http://movie.douban.com/j/search_subjects?type=movie&tag=%E7%83%AD%E9%97%A8&sort=recommend&page_limit=20&page_start=' + "0"
 
-    tags = list(reversed(["热门", "最新", "经典", "可播放", "豆瓣高分", "冷门佳片", \
-            "华语", "欧美", "韩国", "日本", "动作", "喜剧", "爱情", "科幻", "悬疑", \
-                "恐怖", "文艺"]))[1:]
-    page_ends = list(reversed([360, 480, 480, 220, 500, 500, 230, 255, 115, 220, 200, 200, 200, \
-                112, 152, 123, 491]))[1:]
-    _start_url = "http://movie.douban.com/j/search_subjects?type=movie&tag={tag}&sort=recommend&page_limit=20&page_start="
+    # tags = list(reversed(["热门", "最新", "经典", "可播放", "豆瓣高分", "冷门佳片", \
+    #         "华语", "欧美", "韩国", "日本", "动作", "喜剧", "爱情", "科幻", "悬疑", \
+    #             "恐怖", "文艺"]))[1:]
+    # page_ends = list(reversed([360, 480, 480, 220, 500, 500, 230, 255, 115, 220, 200, 200, 200, \
+    #             112, 152, 123, 491]))[1:]
+    # _start_url = "http://movie.douban.com/j/search_subjects?type=movie&tag={tag}&sort=recommend&page_limit=20&page_start="
+    # TODO: 仅有电影数据
+    _start_url = "https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags={tag}&start="
+    page_ends = [10000]
+    tags = ["电影"]
 
     # connect redis database
     redis_connect = redis.StrictRedis(connection_pool=redis.ConnectionPool(
@@ -60,7 +64,6 @@ class DoubanSpider(scrapy.Spider):
     def parse(self, response):
         # from scrapy.shell import inspect_response
         # inspect_response(response, self)
-
         item = DoubanDataItem()
         item["cover_page"] = response.meta["cover_page"]
         item["url"] = response.url
@@ -97,7 +100,7 @@ class DoubanSpider(scrapy.Spider):
         imdb_item = response.css("div#info > a:last-of-type")
         # imdb_item = tree.cssselect("div#info > span:last-of-type + a:first-of-type")
         if not imdb_item:
-                imdb_item = tree.cssselect("div#info > span.pl + a[rel='nofollow']:first-of-type")
+            imdb_item = tree.cssselect("div#info > span.pl + a[rel='nofollow']:first-of-type")
 
         try:
             item["imdb"] = imdb_item[-1].attrib["href"]
@@ -168,8 +171,12 @@ class DoubanSpider(scrapy.Spider):
         """Detailed Page"""
         # from scrapy.shell import inspect_response
         # inspect_response(response, self)
-        
-        data = json.loads(response.text)["subjects"]
+        try:
+            data = json.loads(response.text)["subjects"]
+        except KeyError as err:
+            # category page, the key is data
+            data = json.loads(response.text)["data"]
+
         item = CoverImageItem()
 
         # if there is not data, return None
