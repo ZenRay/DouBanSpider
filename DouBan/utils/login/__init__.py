@@ -6,7 +6,6 @@ import json
 from os import path
 
 from ._settings import payload, headers, redis_conf
-
 from ..exceptions import InappropriateArgument
 
 
@@ -34,7 +33,7 @@ def extract_info(filepath=None, sep=" "):
             yield {"name": user, "passwd": passwd}
 
 
-def generate_cookie(user, passwd, url=None, target="douban"):
+def generate_cookie(name, passwd, url=None, target="douban"):
     if url is None:
         if target.lower() == "douban":
             url = douban_url
@@ -42,13 +41,13 @@ def generate_cookie(user, passwd, url=None, target="douban"):
             raise InappropriateArgument("Missing URL address, must get url or target!")
 
     with requests.session() as session:
-        payload["name"] = user
+        payload["name"] = name
         payload["password"] = passwd
         response = session.post(url, data=payload, headers=headers)
         if response.json()["status"] == "success":
             cookies = session.cookies.get_dict()
             return cookies
-        elif:
+        else:
             raise ConnectionError("Can't login web")
 
 
