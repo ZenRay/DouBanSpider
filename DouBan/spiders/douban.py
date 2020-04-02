@@ -90,6 +90,7 @@ class DoubanSpider(scrapy.Spider):
         elif len(play_duration) == 1:
             item["play_duration"] = play_duration[0]
         else:
+            item["play_duration"] = "0"
             logger.warning(f"播放时间解析错误: {play_duration}")
 
         item["nick_name"] = self.check(tree, "又名")
