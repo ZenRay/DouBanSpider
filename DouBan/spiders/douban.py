@@ -24,20 +24,13 @@ logger = logging.getLogger(__name__)
 
 class DoubanSpider(scrapy.Spider):
     name = 'douban'
-    # allowed_domains = ['douban.com', "movie.douban.com/"]
-    # start_urls = ['https://movie.douban.com/j/search_subjects?type=movie&tag=%E7%BB%8F%E5%85%B8&sort=recommend&page_limit=20&page_start=0']
-    # url = 'http://movie.douban.com/j/search_subjects?type=movie&tag=%E7%83%AD%E9%97%A8&sort=recommend&page_limit=20&page_start=' + "0"
+    allowed_domains = ['douban.com', "movie.douban.com/"]
 
-    # tags = list(reversed(["热门", "最新", "经典", "可播放", "豆瓣高分", "冷门佳片", \
-    #         "华语", "欧美", "韩国", "日本", "动作", "喜剧", "爱情", "科幻", "悬疑", \
-    #             "恐怖", "文艺"]))[1:]
-    # page_ends = list(reversed([360, 480, 480, 220, 500, 500, 230, 255, 115, 220, 200, 200, 200, \
-    #             112, 152, 123, 491]))[1:]
-    # _start_url = "http://movie.douban.com/j/search_subjects?type=movie&tag={tag}&sort=recommend&page_limit=20&page_start="
-    # TODO: 仅有电影数据
-    _start_url = "https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags={tag}&start="
+    # TODO: 仅抓取最新的前 10 页电影
+    _start_url = "https://movie.douban.com/j/new_search_subjects?sort=R&range=0,10&tags={tag}&start="
     page_ends = [10000]
     tags = ["电影"]
+    latest_ends = [10]
 
     # connect redis database
     redis_connect = redis.StrictRedis(connection_pool=redis.ConnectionPool(
@@ -54,7 +47,7 @@ class DoubanSpider(scrapy.Spider):
             start = 0 #self.page_ends[index]
             tag = parse.quote(tag)
             url = self._start_url.format(tag=tag)
-            while start * 20 < self.page_ends[index]:
+            while start <= self.latest_ends[index]:
                 logger.critical(f"URL: {url+str(start*20)}")
                 yield scrapy.Request(url+str(start * 20), callback=self.item_page)
                 # TODO: next page
@@ -62,15 +55,13 @@ class DoubanSpider(scrapy.Spider):
                 
 
     def parse(self, response):
-        # from scrapy.shell import inspect_response
-        # inspect_response(response, self)
         item = DoubanDataItem()
         item["cover_page"] = response.meta["cover_page"]
         item["url"] = response.url
         # item["title"] = response.css('h1 > span::text').extract_first()
         item["title"] = response.meta["title"]
         item["release_year"] = response.css('h1 > span::text')[1].re("\d+")[0]
-        item["rate"] = response.meta["rate"]
+        item["rate"] = response.meta["rate"] or None
         item["id"] = response.meta["id"]
         item["rate_collections"] = response.css("div.rating_sum > a.rating_people > span::text").extract_first()
         # parse div#info element that is content
@@ -86,11 +77,11 @@ class DoubanSpider(scrapy.Spider):
         play_duration = response.xpath("//span[@property='v:runtime']/text()").re(".+分钟")
         # parse play_duration time, if None set 0
         if play_duration is None:
-            item["play_duration"] = '0'
+            item["play_duration"] = None
         elif len(play_duration) == 1:
             item["play_duration"] = play_duration[0]
         else:
-            item["play_duration"] = "0"
+            item["play_duration"] = None
             logger.warning(f"播放时间解析错误: {play_duration}")
 
         item["nick_name"] = self.check(tree, "又名")

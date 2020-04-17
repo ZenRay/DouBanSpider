@@ -51,6 +51,8 @@ def generate_cookie(name, passwd, url=None, target="douban"):
             while response.json()["status"] == "failed" and response.json()["message"] == "captcha_required":
                 time.sleep(300)
                 response = session.post(url, data=payload, headers=headers)
+                # TODO: 需要后续根据实际情况判断，是否需要仅提取其中的字典信息
+                # cookies = session.cookies.get_dict()
                 return cookies
         else:
             raise ConnectionError("Can't login web")
