@@ -61,7 +61,7 @@ DEFAULT_REQUEST_HEADERS = {
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
     'DouBan.middlewares.UserAgentDownloaderMiddleware': 2,
-    "DouBan.middlewares.CookiesRetryDownloaderMidddleware": 100
+    # "DouBan.middlewares.CookiesRetryDownloaderMidddleware": 100
     # 'DouBan.middlewares.ProxyDownloaderMiddleware': 555,
     # 'DouBan.middlewares.DoubanDownloaderMiddleware': 543,
    
@@ -102,10 +102,12 @@ AUTOTHROTTLE_ENABLED = True
 
 # Log config
 from os import path
+import time
 LOG_ENABLED = True
 LOG_ENCODING = "utf8"
 LOG_LEVEL = "INFO"
-LOG_FILE = path.join(path.dirname(__file__), "log/douban.log")
+LOG_FILE = path.join(path.dirname(__file__), \
+    "log/douban_{}.log".format(time.strftime("%Y%m%d", time.localtime())))
 
 
 # DataBase configuration
