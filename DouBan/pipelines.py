@@ -109,15 +109,19 @@ class DoubanStoragePipeline(BaseSQLPipeline):
 
             self.db_cursor.execute(video_sent, video_data)
             self.db_connection.commit()
-            self.db_cursor.execute("SELECT id FROM video WHERE name=%s LIMIT 1;", \
-                                    (item['title'], item['rate']))
-            item["video_id"] = self.db_cursor.fetchone()[0]
+            # self.db_cursor.execute("SELECT id FROM video WHERE name=%s LIMIT 1;", \
+            #                         (item['title'], item['rate']))
+            # item["video_id"] = self.db_cursor.fetchone()[0]
         except TypeError as err:
             self.error_file_store.write(json.dumps(dict(item, query_step="video"), ensure_ascii=False) + "\n")
             self.log(f"Insert value error: {item}, because {err}",level=logging.ERROR)
         except Exception as err:
             self.error_file_store.write(json.dumps(dict(item, query_step="video"), ensure_ascii=False) + "\n")
 
+        self.db_cursor.execute("SELECT id FROM video WHERE `name` = %s ORDER BY create_time DESC;", \
+            (item['title'],))
+        item["video_id"] = self.db_cursor.fetchone()[0]
+        
         # store actor data into table, and query id
         actor_sent = self.insert_sentence("video_actor", self.schema["video_actor"].keys())
         actors_data = self.extract_list(item["actors"], True, item["video_id"])
