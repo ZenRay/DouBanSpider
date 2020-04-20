@@ -109,13 +109,14 @@ class DoubanStoragePipeline(BaseSQLPipeline):
 
             self.db_cursor.execute(video_sent, video_data)
             self.db_connection.commit()
-            self.db_cursor.execute("SELECT id FROM video WHERE name=%s AND score=%s LIMIT 1;", \
+            self.db_cursor.execute("SELECT id FROM video WHERE name=%s LIMIT 1;", \
                                     (item['title'], item['rate']))
             item["video_id"] = self.db_cursor.fetchone()[0]
-        except Exception as err:
-            self.error_file_store.write(json.dumps(dict(item), ensure_ascii=False) + "\n")
+        except TypeError as err:
+            self.error_file_store.write(json.dumps(dict(item, query_step="video"), ensure_ascii=False) + "\n")
             self.log(f"Insert value error: {item}, because {err}",level=logging.ERROR)
-            raise DropItem(f"Insert value error: {item}, because {err}")
+        except Exception as err:
+            self.error_file_store.write(json.dumps(dict(item, query_step="video"), ensure_ascii=False) + "\n")
 
         # store actor data into table, and query id
         actor_sent = self.insert_sentence("video_actor", self.schema["video_actor"].keys())
@@ -123,7 +124,7 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         insert(actor_sent, actors_data, query_step="actor", single_query=False) # insert step
         # query id 
         
-        query_sent = query_sent = f"SELECT DISTINCT id FROM video_actor WHERE `name` in ({'%s, ' * (len(actors_data)-1)}%s) AND `video_id`=%s;"
+        query_sent = f"SELECT DISTINCT id FROM video_actor WHERE `name` in ({'%s, ' * (len(actors_data)-1)}%s) AND `video_id`=%s;"
         query_condition = [i[1] for i in actors_data] + [item["video_id"]]
         self.db_cursor.execute(query_sent, tuple(query_condition))
         actors_id = [i[0] for i in self.db_cursor.fetchall()]
