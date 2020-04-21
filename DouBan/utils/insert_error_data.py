@@ -145,16 +145,25 @@ class Dealer(BaseSQLPipeline):
         if query == 0:
             actor_sent = self.insert_sentence("video_actor", self.schema["video_actor"].keys())
             actors_data = self.extract_list(item["actors"], True, video_id)
-            insert(actor_sent, actors_data, single_query=False, cursor=cursor, \
-                insert_step="video_actor")
+            
+            if len(actors_data) > 0:
+                insert(actor_sent, actors_data, single_query=False, cursor=cursor, \
+                    insert_step="video_actor")
+            else:
+                logger.info(f"{item['id']} doesn't contain actors")
 
         # store director data into table, and query id
         query = cursor.execute("SELECT id FROM video_director WHERE `video_id`= %s", (video_id,))
         if query == 0:
             director_sent = self.insert_sentence("video_director", self.schema["video_director"].keys())
             directors_data = self.extract_list(item["director"], True, video_id)
-            insert(director_sent, directors_data, single_query=False, \
-                cursor=cursor, insert_step="video_director")
+
+            if len(directors_data) > 0:
+                insert(director_sent, directors_data, single_query=False, \
+                    cursor=cursor, insert_step="video_director")
+            else:
+                logger.info(f"{item['id']} doesn't contain directors")
+
         else:
             logger.info(f"{item['id']} inserted in video_director")
 
@@ -164,8 +173,12 @@ class Dealer(BaseSQLPipeline):
         if query == 0:
             category_sent = self.insert_sentence("video_type", self.schema["video_type"].keys())
             category_data = self.extract_list(item["category"], appendix=video_id)
-            insert(category_sent, category_data, single_query=False, \
-                cursor=cursor, insert_step="video_type")
+            
+            if len(category_data) > 0:
+                insert(category_sent, category_data, single_query=False, \
+                    cursor=cursor, insert_step="video_type")
+            else:
+                logger.debug(f"Data id: {item['id']} doesn't contain Category information!")
         else:
             logger.info(f"{item['id']} inserted in video_type")
         
@@ -204,8 +217,12 @@ class Dealer(BaseSQLPipeline):
             for region, time_ in zip(regions, release_times):
                 extension_region_data.append((video_id, region, \
                                 int(item["release_year"]), time_, item["play_duration"], 0))
-            insert(extension_region_sent, extension_region_data, \
-                single_query=False, cursor=cursor, insert_step="video_extension_region")
+            
+            if len(extension_region_data) > 0:
+                insert(extension_region_sent, extension_region_data, \
+                    single_query=False, cursor=cursor, insert_step="video_extension_region")
+            else:
+                logger.debug(f"Data id: {item['id']} has no extension region information!")
         else:
             logger.info(f"{item['id']} inserted in video_extension_region")
 

@@ -18,6 +18,7 @@ from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
 from DouBan.settings import DATABASE_CONF
 
 from DouBan.utils.exceptions import ConnectionError
+from scrapy.exceptions import IgnoreRequest
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,8 @@ class DoubanSpider(scrapy.Spider):
             item["play_duration"] = play_duration[0]
         else:
             item["play_duration"] = None
-            logger.warning(f"播放时间解析错误: {play_duration}")
+            if not isinstance(play_duration, list):
+                logger.warning(f"播放时间解析错误: {play_duration}")
 
         item["nick_name"] = self.check(tree, "又名")
         item["product_country"] = self.check(tree, "制片国家/地区")
@@ -173,8 +175,9 @@ class DoubanSpider(scrapy.Spider):
 
         # if there is not data, return None
         if len(data) == 0:
-            tag = parse.parse_qs(response.url)["tag"]
-            logger.critical(f"{tag} crawled Done")
+            tags = ", ".join(parse.parse_qs(response.url)["tags"])
+            logger.critical(f"{tags} crawled Done")
+             
 
         for page_item in data:
             item["name"] = page_item["title"]

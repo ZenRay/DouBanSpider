@@ -121,17 +121,22 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         self.db_cursor.execute("SELECT id FROM video WHERE `name` = %s ORDER BY create_time DESC;", \
             (item['title'],))
         item["video_id"] = self.db_cursor.fetchone()[0]
-        
+
         # store actor data into table, and query id
         actor_sent = self.insert_sentence("video_actor", self.schema["video_actor"].keys())
         actors_data = self.extract_list(item["actors"], True, item["video_id"])
-        insert(actor_sent, actors_data, query_step="actor", single_query=False) # insert step
-        # query id 
-        
-        query_sent = f"SELECT DISTINCT id FROM video_actor WHERE `name` in ({'%s, ' * (len(actors_data)-1)}%s) AND `video_id`=%s;"
-        query_condition = [i[1] for i in actors_data] + [item["video_id"]]
-        self.db_cursor.execute(query_sent, tuple(query_condition))
-        actors_id = [i[0] for i in self.db_cursor.fetchall()]
+
+        if len(actors_data) > 0:
+            insert(actor_sent, actors_data, query_step="actor", single_query=False) # insert step
+            # query id 
+            
+            query_sent = f"SELECT DISTINCT id FROM video_actor WHERE `name` in ({'%s, ' * (len(actors_data)-1)}%s) AND `video_id`=%s;"
+            query_condition = [i[1] for i in actors_data] + [item["video_id"]]
+            self.db_cursor.execute(query_sent, tuple(query_condition))
+            actors_id = [i[0] for i in self.db_cursor.fetchall()]
+        else:
+            self.log(f"{item['id']} doesn't contain <actors>", level=logging.INFO)
+            actors_id = []
         
         # store director data into table, and query id
         director_sent = self.insert_sentence("video_director", self.schema["video_director"].keys())
@@ -139,15 +144,22 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         insert(director_sent, directors_data, query_step="director", single_query=False)
         
         # query id
-        query_sent  = f"SELECT DISTINCT id FROM video_director WHERE `name` in ({'%s, ' * (len(directors_data)-1)}%s) AND `video_id`=%s;"
-        query_condition = [i[1] for i in directors_data] + [item["video_id"]]
-        self.db_cursor.execute(query_sent, tuple(query_condition))
-        directors_id = [i[0] for i in self.db_cursor.fetchall()]
+        if len(directors_data) > 0:
+            query_sent  = f"SELECT DISTINCT id FROM video_director WHERE `name` in ({'%s, ' * (len(directors_data)-1)}%s) AND `video_id`=%s;"
+            query_condition = [i[1] for i in directors_data] + [item["video_id"]]
+            self.db_cursor.execute(query_sent, tuple(query_condition))
+            directors_id = [i[0] for i in self.db_cursor.fetchall()]
+        else:
+            self.log(f"{item['id']} doesn't contain <directors>", level=logging.INFO)
+            directors_id = []
         
         # store category data into table
         category_sent = self.insert_sentence("video_type", self.schema["video_type"].keys())
         category_data = self.extract_list(item["category"], appendix=item["video_id"])
-        insert(category_sent, category_data, query_step="category", single_query=False)
+        if len(category_data) > 0:
+            insert(category_sent, category_data, query_step="category", single_query=False)
+        else:
+            self.log(f"{item['id']} doesn't contain <category>", level=logging.INFO)
         
         # store review data into table
         review_sent = self.insert_sentence("video_review", self.schema["video_review"].keys())
@@ -156,9 +168,10 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         review_data = [(item["video_id"], index, time_, score, content)  \
                 for index, (time_, score, content) in enumerate(zip(
                     reviews["time"], reviews["rate"], reviews["comment"]))]
-
-        insert(review_sent, review_data, query_step="review", single_query=False)
-
+        if len(review_data) > 0:
+            insert(review_sent, review_data, query_step="review", single_query=False)
+        else:
+            self.log(f"{item['id']} doesn't contain <review>", level=logging.INFO)
         # store video extension region
         """
         [(1, '中国大陆', '2019', '2020', '135分钟', 0),
@@ -173,8 +186,11 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         for region, time_ in zip(regions, release_times):
             extension_region_data.append((item["video_id"], region, \
                             item["release_year"], time_, item["play_duration"], 0))
-        insert(extension_region_sent, extension_region_data, \
-            query_step="video_extention_region", single_query=False)
+        if len(extension_region_data) > 0:
+            insert(extension_region_sent, extension_region_data, \
+                query_step="video_extention_region", single_query=False)
+        else:
+            self.log(f"{item['id']} doesn't contain <extention region>", level=logging.INFO)
 
         # store role information into table
         character_role_sent = self.insert_sentence("video_character", \
@@ -192,9 +208,12 @@ class DoubanStoragePipeline(BaseSQLPipeline):
             #     meta = {"id": directors_id[directors_data.index(name)], "name": name}
             
             # character_role_data.append((item["video_id"], index, name, role, url))
-
-        insert(character_role_sent, character_role_data, \
+        if len(character_role_data) >= 1:
+            insert(character_role_sent, character_role_data, \
             query_step="video_character", single_query=False)
+        else:
+            self.log(f"Data id: {item['id']} has no character information!")
+        
 
         return item
 
