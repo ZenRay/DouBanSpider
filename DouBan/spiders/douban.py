@@ -67,7 +67,6 @@ class DoubanSpider(scrapy.Spider):
         if movies:
             for url in movies:
                 yield scrapy.Request(url, callback=self.direct_parse_page)
-                break
         else:
             for index, tag in enumerate(self.tags):
                 # start = 0
@@ -226,8 +225,8 @@ class DoubanSpider(scrapy.Spider):
 
 
     def direct_parse_page(self, response):
-        from scrapy.shell import inspect_response
-        inspect_response(response, self)
+        # from scrapy.shell import inspect_response
+        # inspect_response(response, self)
         item = DoubanDataItem()
         item["cover_page"] = response.css("div#mainpic  img::attr(src)").get() # response.meta["cover_page"]
         item["url"] = response.url
