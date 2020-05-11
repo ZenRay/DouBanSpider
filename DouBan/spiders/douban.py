@@ -27,19 +27,21 @@ logger = logging.getLogger(__name__)
 # parse the file, so that check whether the addictive file exits
 global_config = configparser.ConfigParser()
 __filepath = path.join(path.dirname(__file__), "../../scrapy.cfg")
-with open(__filepath, "r") as file:
-    global_config.read_file(file)
-    movies = None
-    # if there is addictive file, get the movies url list
-    if global_config.has_option("addictive_file", "path"):
-        if path.exists(__filepath):
-            filename = path.join(path.dirname(__filepath), global_config.get("addictive_file", "path"))
-            with open(filename, "r") as mfile:
-                movies = [i.strip() for i in mfile.readlines()]
 
-        # if delete file option is True, delete file
-        if global_config.getboolean("addictive_file", "delete"):
-            remove(filename)
+if path.exists(__filepath):
+    with open(__filepath, "r") as file:
+        global_config.read_file(file)
+        movies = None
+        # if there is addictive file, get the movies url list
+        if global_config.has_option("addictive_file", "path"):
+            filename = path.join(path.dirname(__filepath), global_config.get("addictive_file", "path"))
+            if path.exists(filename):
+                with open(filename, "r") as mfile:
+                    movies = [i.strip() for i in mfile.readlines()]
+
+                # if delete file option is True, delete file
+                if global_config.getboolean("addictive_file", "delete"):
+                    remove(filename)
 
 
 
