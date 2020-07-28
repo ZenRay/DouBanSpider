@@ -149,7 +149,7 @@ class BaseSQLPipeline(object):
             INSERT INTO <table> (`col1`, `col2`) VALUES (%s, %s)
         """
         sentence = """
-            INSERT INTO {tb} {fieldnames} VALUES {values_symbol};
+            INSERT IGNORE INTO {tb} {fieldnames} VALUES {values_symbol};
         """
 
         fieldnames = "({column})".format(
