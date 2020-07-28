@@ -75,7 +75,8 @@ DOWNLOADER_MIDDLEWARES = {
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    "DouBan.pipelines.DoubanStoragePipeline": 251,
+    "DouBan.pipelines.ListPipeline": 200
+    # "DouBan.pipelines.DoubanStoragePipeline": 251,
 #    'DouBan.pipelines.DoubanPipeline': 300,
 }
 

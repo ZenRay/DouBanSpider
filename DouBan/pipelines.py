@@ -14,7 +14,7 @@ from scrapy.exceptions import DropItem
 
 from DouBan.utils.base import BaseSQLPipeline
 from DouBan.utils.hammers import extract1st_char
-from DouBan.items import DoubanDataItem, CoverImageItem
+from DouBan.items import DoubanDataItem, CoverImageItem, ListItem
 from DouBan.utils.exceptions import InappropriateArgument
 
 cur_path = path.dirname(__file__)
@@ -96,7 +96,7 @@ class DoubanStoragePipeline(BaseSQLPipeline):
         else:
             self.redis_pool.sadd(redis_key, item["id"])
 
-        # TODO: 写入所有数据到 file
+        # !important 写入所有数据到 file
         self.file.write(json.dumps(dict(item), ensure_ascii=False)+"\n")    
 
         # reconnect the database
@@ -300,3 +300,69 @@ class DoubanStoragePipeline(BaseSQLPipeline):
                         for item in split_data]
         
         return result
+
+
+class ListPipeline(BaseSQLPipeline):
+    """
+    存储列表数据
+    """
+    db_type = "mysql"
+
+    def __init__(self, basic_config, redis_config, schema, **kwargs):
+        self.basic_config = basic_config
+        self.redis_config = redis_config
+        self.schema = schema 
+        self._options = kwargs
+
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        schema = {
+            "tag": "tag",
+            "title": "title",
+            "url": "url",
+            "list_id": "list_id",
+            "cover_link": "cover_url",
+            "rate": "rate"
+        }
+        settings = crawler.settings["DATABASE_CONF"]
+        basic_config = copy.deepcopy(settings[cls.db_type])
+        redis_config = settings["redis"]
+        
+
+        return cls(
+            basic_config=basic_config,
+            redis_config=redis_config,
+            schema=schema
+        )
+
+
+    def open_spider(self, spider):
+        self.redis_pool = self.create_connection("redis", self.redis_config)
+        self.db_connection = self.create_connection(self.db_type, self.basic_config, **self._options)
+
+        self.db_cursor = self.db_connection.cursor()
+        # store the exceptions data item
+        self.error_file_store = open(path.join(cur_path, f"log/err_{spider.name}.txt"), "a")
+        
+    
+    def process_item(self, item, spider):
+        # 如果不是 ListItem 的数据，直接返回
+        if not isinstance(item, ListItem):
+            return item
+
+        sentence = self.insert_sentence("list_series", self.schema.keys())
+        data = tuple(item.values())
+        self.db_cursor.execute(sentence, data)
+        self.db_connection.commit()
+
+
+        # ! 处理完列表页数据，不需要后续在进行处理，直接 DropItem
+        raise DropItem(f"影视详情条目写入完成删除 {item['list_id']}: {item['title']}")
+
+
+    def close_spider(self, spider):
+        """Close Spider"""
+        self.db_connection.close()
+        self.redis_pool.close()
+        self.error_file_store.close()
