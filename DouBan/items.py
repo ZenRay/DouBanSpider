@@ -8,6 +8,19 @@
 import scrapy
 
 
+
+class ListItem(scrapy.Item):
+    """
+    豆瓣影视内容列表数据
+    """
+    tag=scrapy.Field(serializer=str) # 豆瓣页面的 tag
+    title=scrapy.Field(serializer=str) # 影视内容标题
+    list_id=scrapy.Field(serializer=str) # 影视内容中 ID，由豆瓣提供
+    rate=scrapy.Field(serializer=str) # 影视内容评分
+    url=scrapy.Field(serializer=str) # 影视列表中各条目的 URL
+    cover_url = scrapy.Field(serializer=str) # 影视列表中各条目的海报 URL
+
+
 class DoubanDataItem(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
