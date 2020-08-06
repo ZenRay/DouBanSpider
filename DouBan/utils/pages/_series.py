@@ -16,8 +16,6 @@ class Details:
     * extract_category, 提取类型信息
     * extract_product_country, 提取制片国家信息
     * extract_language, 提取语言信息
-    * extract_directors, 提取导演信息
-    * extract_screenwriter, 提取编剧信息
     * extract_release_year, 提取成片年份
     * extract_release_date, 提取影片播放日期，存在不同地区播放日期差异
     * extract_play_duration, 提取影片播放时长，存在不同地区不同差异
@@ -26,6 +24,8 @@ class Details:
     * extract_plot, 提取影视剧情简介
     * extract_tags, 提取豆瓣成员标签
     * extract_recommendation_type, 提取豆瓣推荐的类型，解析的内容页面上提供的"好于"类型的信息
+    * extract_directors, 提取导演信息
+    * extract_screenwriter, 提取编剧信息
     """
     def __init__(self):
         pass
@@ -376,3 +376,67 @@ class Details:
             return False
 
 
+class Workers:
+    """
+    解析豆瓣影视页面中的演职人员信息
+    * extract_basic, 解析影视演职人员基本信息，包括需要的中文信息和别名，以及豆瓣提供的 ID
+    * extract_duties, 解析演职人员id 和对应的岗位
+    """
+    @classmethod
+    def extract_basic(cls, response):
+        """提取演职人员基本信息
+
+        提取演职人员信息，根据 generator 判断是否需要以生成器的方式抛出结果
+
+        Results:
+        ---------
+        result: list, 以元组形式保存了 id、姓名(中文注解的姓名)、其他别名、头像图片
+        """
+        elements = response.css(\
+            "div.article > div#celebrities > div.list-wrapper > ul")
+        
+
+        for element in elements:
+            ids = [i.strip() for i in element.css("li > a:first-child::attr(href)").re("\d{2,}")]
+            names = [i.strip() for i in element \
+                        .css("li > a:first-child::attr(title)").extract()]
+            urls = element.css("li > a:first-child > div::attr(style)").re("\((https?.+?)\)")
+            for id, name, url in zip(ids, names, urls):
+                # 假设了姓名中有中文存在，才有可能有其他语言的姓名，否则就只有一个姓名
+                if re.search(r"[\u2E80-\uFAFF]+", name):
+                    if len(name.split(" ")) > 1:
+                        name, alias = name.split(" ", 1)
+                    else:
+                        alias = None
+                else:
+                    alias = None
+    
+                yield id, name, alias, url
+            
+
+    @classmethod
+    def extract_duties(cls, respones):
+        """获取岗位信息
+
+        获取演职人员岗位信息，生成一个元组信息: 影视 ID、演职人员 ID、岗位、动作类型(主要为演
+        员参与的动作，eg: 配音、饰演)、角色姓名。以生成器的方式得
+        传输结果
+        """
+        product_id = re.search(r"/(\d{3,})/?", response.url).group(1)
+        duties = response.css(
+                "div.article > div#celebrities > div.list-wrapper > h2::text"
+            ).extract()
+        elements = response.css(\
+            "div.article > div#celebrities > div.list-wrapper > ul")
+        for duty, element in zip(duties, elements):
+            ids = [i.strip() for i in element.css("li > a:first-child::attr(href)").re("\d{2,}")] 
+            roles = [i.split(" ", 1)[-1] for i in element.css("li > div.info > span.role::text").re("\((.*)\)")]
+            actions = [i.split(" ", 1)[0] for i in element.css("li > div.info > span.role::text").re("\((.*)\)")]
+            duty = "/".join(i.strip() for i in duty.split(" ", 1))
+
+            if roles and actions:
+                for id, role, action in zip(ids, roles, actions):
+                    yield product_id, id, duty, action, role
+            else:
+                for id in ids:
+                    yield product_id, id, duty, None, None
