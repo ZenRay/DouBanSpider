@@ -3,6 +3,8 @@ from __future__ import absolute_import
 import re
 import json
 import datetime
+
+from collections import namedtuple
 from DouBan.utils.exceptions import LostArgument, ValueConsistenceError
 
 
@@ -404,6 +406,7 @@ class Details:
 class Workers:
     """
     解析豆瓣影视页面中的演职人员信息
+    可以得到内容的链接为 https://movie.douban.com/subject/{影视 ID}/celebrities
     * extract_basic, 解析影视演职人员基本信息，包括需要的中文信息和别名，以及豆瓣提供的 ID
     * extract_duties, 解析演职人员id 和对应的岗位
     """
@@ -440,7 +443,7 @@ class Workers:
             
 
     @classmethod
-    def extract_duties(cls, respones):
+    def extract_duties(cls, response):
         """获取岗位信息
 
         获取演职人员岗位信息，生成一个元组信息: 影视 ID、演职人员 ID、岗位、动作类型(主要为演
@@ -465,3 +468,88 @@ class Workers:
             else:
                 for id in ids:
                     yield product_id, id, duty, None, None
+
+
+class Pictures:
+    """
+    解析海报页面图片链接: https://movie.douban.com/subject/<影视 ID>/photos?type=R
+
+    # * extract_poster, 提取海报信息
+    # * extract_wallpaper, 提取壁纸信息
+    """
+    __poster = namedtuple("poster", ["id", "url", "description", "specification"])
+    __wallpaper = namedtuple("wallpaper", ["id", "url", "specification"])
+    __slots__ = ()
+    @classmethod
+    def extract_poster(cls, response):
+        """
+        提取海报链接
+
+        保存了当前图片列表页中的链接，没有请求原始海报（需要解决登录的问题），保存的内容为图片
+        ID、链接、海报简短描述（一般是描述的是使用场景）、原始海报规格(注意不是保存的链接图片的
+        规格)
+
+        Results:
+        ------------
+        result: dict, key 是海报的 id，nametuple 保存 value，包括了 id,url, 
+            description, specification
+        next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
+        """
+        elements = response.css("div#wrapper > div#content div.article > ul > li")
+
+        if elements:
+            result = {}
+            for element in elements:
+                id = element.css("::attr(data-id)").extract_first().strip()
+                url = element.css("div.cover img::attr(src)").extract_first().strip()
+                description = element.css("div.name::text").extract_first().strip()
+                specification = element.css("div.prop::text").extract_first().strip()
+                result[id] = cls.__poster(id, url, description, specification)
+
+            # 如果有下一页需要和结果一起传出
+            has_next = response.css(
+                "div#wrapper div.article > div.paginator > span.next > a::attr(href)"
+                ).extract_first()
+            if has_next:
+                next_ = has_next.strip()
+            else:
+                next_ = False
+            
+            return result, next_
+
+
+    @classmethod
+    def extract_wallpaper(cls, response):
+        """
+        提取壁纸链接
+
+        保存了当前图片列表页中的链接，没有请求原始壁纸（需要解决登录的问题），保存的内容为图片
+        ID、链接、原始海报规格(注意不是保存的链接图片的规格)
+
+        Results:
+        ------------
+        result: dict, key 是海报的 id，nametuple 保存 value，包括了 id,url, 
+           specification
+        next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
+        """    
+        elements = response.css("div#wrapper > div#content div.article > ul > li")
+
+        if elements:
+            result = {}
+            for element in elements:
+                id = element.css("::attr(data-id)").extract_first().strip()
+                url = element.css("div.cover img::attr(src)").extract_first().strip()
+                # description = element.css("div.name::text").extract_first().strip()
+                specification = element.css("div.prop::text").extract_first().strip()
+                result[id] = cls.__wallpaper(id, url, specification)
+
+            # 如果有下一页需要和结果一起传出
+            has_next = response.css(
+                "div#wrapper div.article > div.paginator > span.next > a::attr(href)"
+                ).extract_first()
+            if has_next:
+                next_ = has_next.strip()
+            else:
+                next_ = False
+            
+            return result, next_ 
