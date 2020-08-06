@@ -473,6 +473,7 @@ class Workers:
 class Pictures:
     """
     解析海报页面图片链接: https://movie.douban.com/subject/<影视 ID>/photos?type=R
+    解析壁纸页面图片链接: https://movie.douban.com/subject/<影视 ID>/photos?type=W
 
     # * extract_poster, 提取海报信息
     # * extract_wallpaper, 提取壁纸信息
@@ -539,7 +540,7 @@ class Pictures:
             for element in elements:
                 id = element.css("::attr(data-id)").extract_first().strip()
                 url = element.css("div.cover img::attr(src)").extract_first().strip()
-                # description = element.css("div.name::text").extract_first().strip()
+                
                 specification = element.css("div.prop::text").extract_first().strip()
                 result[id] = cls.__wallpaper(id, url, specification)
 
@@ -553,3 +554,170 @@ class Pictures:
                 next_ = False
             
             return result, next_ 
+
+
+class Comments:
+    """
+    提取评论信息
+    解析短评论信息，短评论有分为看过短片和没有看过影片的链接:
+    * 看过影片的链接：https://movie.douban.com/subject/<影视 ID>/comments?status=P
+    * 没有看过的链接：https://movie.douban.com/subject/<影视 ID>/comments?status=F
+
+    解析长评论信息
+    解析长评论信息，长评论链接：https://movie.douban.com/subject/<影视 ID>/reviews
+    """
+    __short = namedtuple("short_comment", \
+        ["name", "uid", "upic", "date", "cid", "rate", "content", "thumb", "watched"])
+
+    __review = namedtuple("review", \
+        ["name", "uid", "upic", "date", "cid", "rate", "short_content", "title", \
+            "content_url", "thumb", "down", "reply"])
+    @classmethod
+    def extract_short_comment(cls, response):
+        """
+        提取短评论信息
+
+        获取到的信息包括用户姓名(name), 用户 ID(uid), 用户头像链接(upic), 
+        用户评论日期(date), 用户评论的 ID(cid, 豆瓣页面获取), 用户评分(rate，保留 5 星评
+        等级), 用户评论内容(content), 其他用户支持的数量(thumb), 用户是否已经看过(watched)
+
+        Results:
+        ------------
+        result: dict, key 是评论的 id，nametuple 保存 value，包括了 name, uid, upic,
+            date, cid, rate, content, thumb
+        next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
+        """
+        elements = response.css(
+            "div#wrapper > div#content  div.article div#comments > div.comment-item"
+        )
+
+        if elements:
+            result = {}
+            # 判断用户是否已经看过影片需要从页面链接中 status 值判断
+            if re.search("status=(\w)", response.url).group(1) == "F":
+                watched = False 
+            elif re.search("status=(\w)", response.url).group(1) == "P":
+                watched = True
+            else:
+                raise ValueConsistenceError(f"can't extract watched information")
+
+            for element in elements:
+                name = element.css("div.avatar > a::attr(title)") \
+                        .extract_first().strip() 
+                uid = element.css("div.avatar > a::attr(href)") \
+                        .extract_first().strip()
+                upic = element.css("div.avatar > a > img::attr(src)") \
+                        .extract_first().strip()
+                date = element.css(
+                        "div.comment span.comment-info > span.comment-time::attr(title)"
+                    ).extract_first().strip()
+                cid = element.css("::attr(data-cid)").extract_first().strip()
+                rate = element.css(
+                        "div.comment  span.comment-info > span.rating::attr(class)"
+                    ).re("\d+")
+                
+                # 如果没有评分值，则返回 None
+                rate = None if not rate else int(float(rate[0].strip())) // 10
+                content = element.css("div.comment > p span.short::text") \
+                        .extract_first().strip()
+                thumb = int(float(element.css("div.comment > h3  span.votes::text") \
+                        .extract_first().strip()))
+                
+
+                result[cid] = cls.__short(name=name, uid=uid, upic=upic, watched=\
+                    watched, date=date, cid=cid, rate=rate, content=content, thumb=thumb)
+            # 如果有下一页需要和结果一起传出
+            has_next = response.css(
+                "div#wrapper div.article div#comments > div#paginator > a.next::attr(href)"
+                ).extract_first()
+
+            if has_next:
+                next_ = re.sub("^(.*comments).*$", 
+                    lambda x: x.group(1) + has_next.strip(), response.url)
+            else:
+                next_ = False
+            
+            return result, next_  
+
+
+    @classmethod
+    def extract_reviews(cls, response):
+        """
+        提取长评论信息
+
+        获取到的信息包括用户姓名(name), 用户 ID(uid), 用户头像链接(upic), 
+        用户评论日期(date), 用户评论的 ID(cid, 豆瓣页面获取), 用户评分(rate，保留 5 星评
+        等级), 用户评论短内容(short_content，保留了显示内容), 用户评论完整内容可以请求的 
+        URL (content_url) 其他用户支持的数量(thumb), 不支持的数量(down)，恢复数量(reply)
+
+        Results:
+        ------------
+        result: dict, key 是评论的 id，nametuple 保存 value，包括了 name, uid, upic,
+            date, cid, rate, content, thumb
+        next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
+        """
+        elements = response.css("div.review-list > div")
+
+        if elements:
+            result = {}
+            for element in elements:
+                name = element.css("header.main-hd > a.name::text") \
+                    .extract_first().strip()
+                uid = element.css("header.main-hd > a.name::attr(href)") \
+                    .extract_first().strip() 
+
+                upic = element.css("header.main-hd > a.avator > img::attr(src)") \
+                    .extract_first().strip()
+
+                date = element.css("header.main-hd > span.main-meta::text") \
+                    .extract_first().strip()
+                
+                cid = element.css("::attr(data-cid)") \
+                    .extract_first().strip()
+                
+                rate = element.css(
+                        "header.main-hd > span.main-title-rating::attr(class)"
+                    ).re("\d+")
+        
+                # 如果没有评分值，则返回 None
+                rate = None if not rate else int(float(rate[0].strip())) // 10
+
+                short_content = "".join(i.strip() for i in element.css(
+                        "div.main-bd > div.review-short > div.short-content::text"
+                    ).extract())
+
+                title = element.css("div.main-bd > h2 > a::text").extract_first().strip()
+                content_url = element.css("div.main-bd > h2 > a::attr(href)") \
+                    .extract_first().strip()
+                
+                thumb = element.css("div.main-bd > div.action a[title='有用'] > span::text") \
+                    .extract_first().strip()
+
+                thumb = 0 if not thumb else int(float(thumb.strip()))
+
+                down = element.css("div.main-bd > div.action a[title='没用'] > span::text") \
+                    .extract_first().strip()
+
+                down = 0 if not down else int(float(down.strip()))
+
+                reply = element.css("div.main-bd > div.action a.reply::text").re("\d+")
+
+                reply = 0 if not reply else int(float(reply[0].strip()))
+
+                result[cid] = cls.__review(name=name, uid=uid, upic=upic, \
+                    date=date, cid=cid, rate=rate, short_content=short_content,
+                    title=title, content_url=content_url, thumb=thumb, down=down,
+                    reply=reply)
+
+                        # 如果有下一页需要和结果一起传出
+            has_next = response.css(
+                "div#wrapper div#content div.article > div.paginator > span.next >a::attr(href)"
+                ).extract_first()
+
+            if has_next:
+                next_ = re.sub("^(.*reviews).*$", 
+                    lambda x: x.group(1) + has_next.strip(), response.url)
+            else:
+                next_ = False
+            
+            return result, next_  
