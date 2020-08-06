@@ -24,8 +24,10 @@ class Details:
     * extract_plot, 提取影视剧情简介
     * extract_tags, 提取豆瓣成员标签
     * extract_recommendation_type, 提取豆瓣推荐的类型，解析的内容页面上提供的"好于"类型的信息
+    ------如果页面没有演职人员链接时，需要从主页提取相关信息----------
     * extract_directors, 提取导演信息
     * extract_screenwriter, 提取编剧信息
+    * extract_actors, 提取演员信息
     """
     def __init__(self):
         pass
@@ -306,7 +308,7 @@ class Details:
                 ).extract()
             for name, id_ in zip(names, ids_):
                 id_ = None if "search_text" in id_ else re.search(r"\d+", id_).group().strip()
-                result = {name.strip(): id_}
+                result[name.strip()] = id_
 
             return result
 
@@ -329,10 +331,33 @@ class Details:
                 ).extract()
             for name, id_ in zip(names, ids_):
                 id_ = None if "search_text" in id_ else re.search(r"\d+", id_).group().strip()
-                result = {name.strip(): id_}
+                result[name.strip()] = id_
 
             return result
 
+
+    @classmethod
+    def extract_actors(cls, response):
+        """提取演员信息
+        """
+        # 如果类型是编剧存在，再查询编剧信息
+        if Details.check_attribute(response, name="主演", \
+            query="div#info > span:nth-of-type(3) > span::text"):
+            result = {}
+
+            names = response.css(
+                    "div#info > span:nth-of-type(3) > span.attrs > a::text"
+                ).extract()
+
+            ids = response.css(
+                    "div#info > span:nth-of-type(3) > span.attrs > a::attr(href)"
+                ).extract()
+
+            for name, id_ in zip(names, ids):
+                id_ = None if "search_text" in id_ else re.search(r"\/(\d{2,})\/", id_).group(1).strip()
+                result[name.strip()] =  id_
+
+            return result
 
     @classmethod
     def extract_recommendation_type(cls, response):
