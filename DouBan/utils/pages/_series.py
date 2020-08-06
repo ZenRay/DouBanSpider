@@ -721,3 +721,21 @@ class Comments:
                 next_ = False
             
             return result, next_  
+
+
+    @classmethod
+    def extract_review_content(cls, response):
+        """
+        解析影评评论中的完成内容
+
+        页面的请求于 extract_reviews 中的 content_url
+        """
+        contents = response.css("div#link-report > div.review-content::text") \
+            .extract()
+        
+        if contents:
+            return "\n".join(content.strip() for content in contents)
+        else:
+            raise ValueConsistenceError(f"can't get review: {response.url}")
+
+
