@@ -3,6 +3,8 @@ from __future__ import absolute_import
 import re
 import json
 import datetime
+
+from collections import namedtuple
 from DouBan.utils.exceptions import LostArgument, ValueConsistenceError
 
 
@@ -16,8 +18,6 @@ class Details:
     * extract_category, 提取类型信息
     * extract_product_country, 提取制片国家信息
     * extract_language, 提取语言信息
-    * extract_directors, 提取导演信息
-    * extract_screenwriter, 提取编剧信息
     * extract_release_year, 提取成片年份
     * extract_release_date, 提取影片播放日期，存在不同地区播放日期差异
     * extract_play_duration, 提取影片播放时长，存在不同地区不同差异
@@ -26,6 +26,10 @@ class Details:
     * extract_plot, 提取影视剧情简介
     * extract_tags, 提取豆瓣成员标签
     * extract_recommendation_type, 提取豆瓣推荐的类型，解析的内容页面上提供的"好于"类型的信息
+    ------如果页面没有演职人员链接时，需要从主页提取相关信息----------
+    * extract_directors, 提取导演信息
+    * extract_screenwriter, 提取编剧信息
+    * extract_actors, 提取演员信息
     """
     def __init__(self):
         pass
@@ -306,7 +310,7 @@ class Details:
                 ).extract()
             for name, id_ in zip(names, ids_):
                 id_ = None if "search_text" in id_ else re.search(r"\d+", id_).group().strip()
-                result = {name.strip(): id_}
+                result[name.strip()] = id_
 
             return result
 
@@ -329,10 +333,33 @@ class Details:
                 ).extract()
             for name, id_ in zip(names, ids_):
                 id_ = None if "search_text" in id_ else re.search(r"\d+", id_).group().strip()
-                result = {name.strip(): id_}
+                result[name.strip()] = id_
 
             return result
 
+
+    @classmethod
+    def extract_actors(cls, response):
+        """提取演员信息
+        """
+        # 如果类型是编剧存在，再查询编剧信息
+        if Details.check_attribute(response, name="主演", \
+            query="div#info > span:nth-of-type(3) > span::text"):
+            result = {}
+
+            names = response.css(
+                    "div#info > span:nth-of-type(3) > span.attrs > a::text"
+                ).extract()
+
+            ids = response.css(
+                    "div#info > span:nth-of-type(3) > span.attrs > a::attr(href)"
+                ).extract()
+
+            for name, id_ in zip(names, ids):
+                id_ = None if "search_text" in id_ else re.search(r"\/(\d{2,})\/", id_).group(1).strip()
+                result[name.strip()] =  id_
+
+            return result
 
     @classmethod
     def extract_recommendation_type(cls, response):
@@ -376,3 +403,321 @@ class Details:
             return False
 
 
+class Workers:
+    """
+    解析豆瓣影视页面中的演职人员信息
+    可以得到内容的链接为 https://movie.douban.com/subject/{影视 ID}/celebrities
+    * extract_basic, 解析影视演职人员基本信息，包括需要的中文信息和别名，以及豆瓣提供的 ID
+    * extract_duties, 解析演职人员id 和对应的岗位
+    """
+    @classmethod
+    def extract_basic(cls, response):
+        """提取演职人员基本信息
+
+        提取演职人员信息，根据 generator 判断是否需要以生成器的方式抛出结果
+
+        Results:
+        ---------
+        result: list, 以元组形式保存了 id、姓名(中文注解的姓名)、其他别名、头像图片
+        """
+        elements = response.css(\
+            "div.article > div#celebrities > div.list-wrapper > ul")
+        
+
+        for element in elements:
+            ids = [i.strip() for i in element.css("li > a:first-child::attr(href)").re("\d{2,}")]
+            names = [i.strip() for i in element \
+                        .css("li > a:first-child::attr(title)").extract()]
+            urls = element.css("li > a:first-child > div::attr(style)").re("\((https?.+?)\)")
+            for id, name, url in zip(ids, names, urls):
+                # 假设了姓名中有中文存在，才有可能有其他语言的姓名，否则就只有一个姓名
+                if re.search(r"[\u2E80-\uFAFF]+", name):
+                    if len(name.split(" ")) > 1:
+                        name, alias = name.split(" ", 1)
+                    else:
+                        alias = None
+                else:
+                    alias = None
+    
+                yield id, name, alias, url
+            
+
+    @classmethod
+    def extract_duties(cls, response):
+        """获取岗位信息
+
+        获取演职人员岗位信息，生成一个元组信息: 影视 ID、演职人员 ID、岗位、动作类型(主要为演
+        员参与的动作，eg: 配音、饰演)、角色姓名。以生成器的方式得
+        传输结果
+        """
+        product_id = re.search(r"/(\d{3,})/?", response.url).group(1)
+        duties = response.css(
+                "div.article > div#celebrities > div.list-wrapper > h2::text"
+            ).extract()
+        elements = response.css(\
+            "div.article > div#celebrities > div.list-wrapper > ul")
+        for duty, element in zip(duties, elements):
+            ids = [i.strip() for i in element.css("li > a:first-child::attr(href)").re("\d{2,}")] 
+            roles = [i.split(" ", 1)[-1] for i in element.css("li > div.info > span.role::text").re("\((.*)\)")]
+            actions = [i.split(" ", 1)[0] for i in element.css("li > div.info > span.role::text").re("\((.*)\)")]
+            duty = "/".join(i.strip() for i in duty.split(" ", 1))
+
+            if roles and actions:
+                for id, role, action in zip(ids, roles, actions):
+                    yield product_id, id, duty, action, role
+            else:
+                for id in ids:
+                    yield product_id, id, duty, None, None
+
+
+class Pictures:
+    """
+    解析海报页面图片链接: https://movie.douban.com/subject/<影视 ID>/photos?type=R
+    解析壁纸页面图片链接: https://movie.douban.com/subject/<影视 ID>/photos?type=W
+
+    # * extract_poster, 提取海报信息
+    # * extract_wallpaper, 提取壁纸信息
+    """
+    __poster = namedtuple("poster", ["id", "url", "description", "specification"])
+    __wallpaper = namedtuple("wallpaper", ["id", "url", "specification"])
+    __slots__ = ()
+    @classmethod
+    def extract_poster(cls, response):
+        """
+        提取海报链接
+
+        保存了当前图片列表页中的链接，没有请求原始海报（需要解决登录的问题），保存的内容为图片
+        ID、链接、海报简短描述（一般是描述的是使用场景）、原始海报规格(注意不是保存的链接图片的
+        规格)
+
+        Results:
+        ------------
+        result: dict, key 是海报的 id，nametuple 保存 value，包括了 id,url, 
+            description, specification
+        next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
+        """
+        elements = response.css("div#wrapper > div#content div.article > ul > li")
+
+        if elements:
+            result = {}
+            for element in elements:
+                id = element.css("::attr(data-id)").extract_first().strip()
+                url = element.css("div.cover img::attr(src)").extract_first().strip()
+                description = element.css("div.name::text").extract_first().strip()
+                specification = element.css("div.prop::text").extract_first().strip()
+                result[id] = cls.__poster(id, url, description, specification)
+
+            # 如果有下一页需要和结果一起传出
+            has_next = response.css(
+                "div#wrapper div.article > div.paginator > span.next > a::attr(href)"
+                ).extract_first()
+            if has_next:
+                next_ = has_next.strip()
+            else:
+                next_ = False
+            
+            return result, next_
+
+
+    @classmethod
+    def extract_wallpaper(cls, response):
+        """
+        提取壁纸链接
+
+        保存了当前图片列表页中的链接，没有请求原始壁纸（需要解决登录的问题），保存的内容为图片
+        ID、链接、原始海报规格(注意不是保存的链接图片的规格)
+
+        Results:
+        ------------
+        result: dict, key 是海报的 id，nametuple 保存 value，包括了 id,url, 
+           specification
+        next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
+        """    
+        elements = response.css("div#wrapper > div#content div.article > ul > li")
+
+        if elements:
+            result = {}
+            for element in elements:
+                id = element.css("::attr(data-id)").extract_first().strip()
+                url = element.css("div.cover img::attr(src)").extract_first().strip()
+                
+                specification = element.css("div.prop::text").extract_first().strip()
+                result[id] = cls.__wallpaper(id, url, specification)
+
+            # 如果有下一页需要和结果一起传出
+            has_next = response.css(
+                "div#wrapper div.article > div.paginator > span.next > a::attr(href)"
+                ).extract_first()
+            if has_next:
+                next_ = has_next.strip()
+            else:
+                next_ = False
+            
+            return result, next_ 
+
+
+class Comments:
+    """
+    提取评论信息
+    解析短评论信息，短评论有分为看过短片和没有看过影片的链接:
+    * 看过影片的链接：https://movie.douban.com/subject/<影视 ID>/comments?status=P
+    * 没有看过的链接：https://movie.douban.com/subject/<影视 ID>/comments?status=F
+
+    解析长评论信息
+    解析长评论信息，长评论链接：https://movie.douban.com/subject/<影视 ID>/reviews
+    """
+    __short = namedtuple("short_comment", \
+        ["name", "uid", "upic", "date", "cid", "rate", "content", "thumb", "watched"])
+
+    __review = namedtuple("review", \
+        ["name", "uid", "upic", "date", "cid", "rate", "short_content", "title", \
+            "content_url", "thumb", "down", "reply"])
+    @classmethod
+    def extract_short_comment(cls, response):
+        """
+        提取短评论信息
+
+        获取到的信息包括用户姓名(name), 用户 ID(uid), 用户头像链接(upic), 
+        用户评论日期(date), 用户评论的 ID(cid, 豆瓣页面获取), 用户评分(rate，保留 5 星评
+        等级), 用户评论内容(content), 其他用户支持的数量(thumb), 用户是否已经看过(watched)
+
+        Results:
+        ------------
+        result: dict, key 是评论的 id，nametuple 保存 value，包括了 name, uid, upic,
+            date, cid, rate, content, thumb
+        next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
+        """
+        elements = response.css(
+            "div#wrapper > div#content  div.article div#comments > div.comment-item"
+        )
+
+        if elements:
+            result = {}
+            # 判断用户是否已经看过影片需要从页面链接中 status 值判断
+            if re.search("status=(\w)", response.url).group(1) == "F":
+                watched = False 
+            elif re.search("status=(\w)", response.url).group(1) == "P":
+                watched = True
+            else:
+                raise ValueConsistenceError(f"can't extract watched information")
+
+            for element in elements:
+                name = element.css("div.avatar > a::attr(title)") \
+                        .extract_first().strip() 
+                uid = element.css("div.avatar > a::attr(href)") \
+                        .extract_first().strip()
+                upic = element.css("div.avatar > a > img::attr(src)") \
+                        .extract_first().strip()
+                date = element.css(
+                        "div.comment span.comment-info > span.comment-time::attr(title)"
+                    ).extract_first().strip()
+                cid = element.css("::attr(data-cid)").extract_first().strip()
+                rate = element.css(
+                        "div.comment  span.comment-info > span.rating::attr(class)"
+                    ).re("\d+")
+                
+                # 如果没有评分值，则返回 None
+                rate = None if not rate else int(float(rate[0].strip())) // 10
+                content = element.css("div.comment > p span.short::text") \
+                        .extract_first().strip()
+                thumb = int(float(element.css("div.comment > h3  span.votes::text") \
+                        .extract_first().strip()))
+                
+
+                result[cid] = cls.__short(name=name, uid=uid, upic=upic, watched=\
+                    watched, date=date, cid=cid, rate=rate, content=content, thumb=thumb)
+            # 如果有下一页需要和结果一起传出
+            has_next = response.css(
+                "div#wrapper div.article div#comments > div#paginator > a.next::attr(href)"
+                ).extract_first()
+
+            if has_next:
+                next_ = re.sub("^(.*comments).*$", 
+                    lambda x: x.group(1) + has_next.strip(), response.url)
+            else:
+                next_ = False
+            
+            return result, next_  
+
+
+    @classmethod
+    def extract_reviews(cls, response):
+        """
+        提取长评论信息
+
+        获取到的信息包括用户姓名(name), 用户 ID(uid), 用户头像链接(upic), 
+        用户评论日期(date), 用户评论的 ID(cid, 豆瓣页面获取), 用户评分(rate，保留 5 星评
+        等级), 用户评论短内容(short_content，保留了显示内容), 用户评论完整内容可以请求的 
+        URL (content_url) 其他用户支持的数量(thumb), 不支持的数量(down)，恢复数量(reply)
+
+        Results:
+        ------------
+        result: dict, key 是评论的 id，nametuple 保存 value，包括了 name, uid, upic,
+            date, cid, rate, content, thumb
+        next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
+        """
+        elements = response.css("div.review-list > div")
+
+        if elements:
+            result = {}
+            for element in elements:
+                name = element.css("header.main-hd > a.name::text") \
+                    .extract_first().strip()
+                uid = element.css("header.main-hd > a.name::attr(href)") \
+                    .extract_first().strip() 
+
+                upic = element.css("header.main-hd > a.avator > img::attr(src)") \
+                    .extract_first().strip()
+
+                date = element.css("header.main-hd > span.main-meta::text") \
+                    .extract_first().strip()
+                
+                cid = element.css("::attr(data-cid)") \
+                    .extract_first().strip()
+                
+                rate = element.css(
+                        "header.main-hd > span.main-title-rating::attr(class)"
+                    ).re("\d+")
+        
+                # 如果没有评分值，则返回 None
+                rate = None if not rate else int(float(rate[0].strip())) // 10
+
+                short_content = "".join(i.strip() for i in element.css(
+                        "div.main-bd > div.review-short > div.short-content::text"
+                    ).extract())
+
+                title = element.css("div.main-bd > h2 > a::text").extract_first().strip()
+                content_url = element.css("div.main-bd > h2 > a::attr(href)") \
+                    .extract_first().strip()
+                
+                thumb = element.css("div.main-bd > div.action a[title='有用'] > span::text") \
+                    .extract_first().strip()
+
+                thumb = 0 if not thumb else int(float(thumb.strip()))
+
+                down = element.css("div.main-bd > div.action a[title='没用'] > span::text") \
+                    .extract_first().strip()
+
+                down = 0 if not down else int(float(down.strip()))
+
+                reply = element.css("div.main-bd > div.action a.reply::text").re("\d+")
+
+                reply = 0 if not reply else int(float(reply[0].strip()))
+
+                result[cid] = cls.__review(name=name, uid=uid, upic=upic, \
+                    date=date, cid=cid, rate=rate, short_content=short_content,
+                    title=title, content_url=content_url, thumb=thumb, down=down,
+                    reply=reply)
+
+                        # 如果有下一页需要和结果一起传出
+            has_next = response.css(
+                "div#wrapper div#content div.article > div.paginator > span.next >a::attr(href)"
+                ).extract_first()
+
+            if has_next:
+                next_ = re.sub("^(.*reviews).*$", 
+                    lambda x: x.group(1) + has_next.strip(), response.url)
+            else:
+                next_ = False
+            
+            return result, next_  
