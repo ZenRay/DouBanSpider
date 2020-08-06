@@ -24,6 +24,6 @@ class ConnectionError(Exception):
     pass
 
 
-class ValueConsistence(Exception):
+class ValueConsistenceError(Exception):
     """检测值和提取值不一致"""
     pass
