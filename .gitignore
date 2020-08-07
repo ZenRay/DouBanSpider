@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.DS_Store
+insert
+user_pw.txt
+.all.txt
+test_spider.py
+tf.sh
+DouBan/database/海南电影数据库设计.docx
+error.json
+movies.txt
+
+README.md
+DouBan/log/err_series.txt
