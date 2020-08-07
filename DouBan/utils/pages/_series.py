@@ -27,6 +27,7 @@ class Details:
     * extract_tags, 提取豆瓣成员标签
     * extract_recommendation_type, 提取豆瓣推荐的类型，解析的内容页面上提供的"好于"类型的信息
     * extract_recommendation_item, 提取豆瓣对当前内容推荐对相似条目
+    * extract_episode_info, 提取电视剧的各集剧情信息
     ------如果页面没有演职人员链接时，需要从主页提取相关信息----------
     * extract_directors, 提取导演信息
     * extract_screenwriter, 提取编剧信息
@@ -37,13 +38,17 @@ class Details:
     __recommendation_item: 当前内容推荐的其他相关内容，包括豆瓣 ID 和内容标题名称
     __content_name: 当前内容的名称，name 为页面中条目标题名称，alias 为根据可选名称得到了
             别名
-    __people: 演职人员信息，ID 演职人员 ID，name 演职人员姓名
+    __people: 演职人员信息，id 演职人员 ID，name 演职人员姓名
+    __episode: 剧集简介信息，id 剧集 ID，episode 当前集数，title 当前剧集标题，origin 当
+        前剧集原始标题，date 当前剧集播放日期，plot 当前剧集剧情简介
     """
     __recommendation_item = namedtuple("recommendation_item", \
         ["id", "name"])
 
     __content_name = namedtuple("item_name", ["name", "alias"])
     __people = namedtuple("worker", ["id", "name"])
+    __episode = namedtuple("episode", ["id", "episode", "title", "origin", \
+        "date", "plot"])
 
     def __init__(self):
         pass
@@ -431,6 +436,70 @@ class Details:
             return True
         else:
             return False
+
+
+    @classmethod
+    def extract_episode_info(cls, response):
+        """提取电视剧剧集信息
+
+        需要请求的链接: https://movie.douban.com/subject/{影视 ID}/episode/{episode}/
+        提取剧集各集的介绍，包括影视的 ID，影视集数，影视当前集数标题，当前影视原始标题以及播
+        放日期、剧情简介
+        """
+        id = re.search("subject\/(\d{2,})\/episode", response.url).group(1)
+        episode = re.search("episode\/(\d{1,3})", response.url).group(1)
+        # 判断是否有中文名
+        if cls.check_attribute(response, name="本集中文名:", query= \
+            "div.article > ul.ep-info > li:nth-of-type(1) > span:nth-of-type(1)::text"):
+            title = response.css(
+                    "div.article > ul.ep-info > li:nth-of-type(1) > span.all::text"
+                ).extract_first()
+            if title:
+                title = title.strip()
+        else:
+            title = None
+        
+        # 判断是否有原始名称 
+        origin = response.css(
+                    "div.article > ul.ep-info > li:nth-of-type(2) > span.all::text"
+                ).extract_first()
+        if origin:
+            origin = origin.strip()
+        
+        # 播放时间
+        element = response.xpath(
+            "//div[@class='article']/ul[@class='ep-info']/li[position()=3]/span[@class='all']"
+        )
+        if element:
+            date = element.xpath("./text()").extract_first().strip() + " " + \
+                element.xpath("./following-sibling::text()").extract_first().strip()
+            # 如果有确认播放时间区域，需要添加上相关信息
+            local = response.css(
+                    "div.article > ul.ep-info > li:nth-of-type(3) > span.note::text"
+                ).extract_first()
+            if local:
+                date += " " + local.strip()
+        else:
+            date = None
+        
+
+        # 剧情信息
+        plot = response.css("div.article > ul.ep-info p#link-report") \
+                        .css("span.all::text").extract_first()
+
+        if plot:
+            plot = plot.strip()
+            # 如果有隐藏信息需要添加上
+            more = "\n".join(i.strip() for i in \
+                element.css("span.hide::text").extract())
+            if more:
+                plot += more.strip()
+        
+
+        result = cls.__episode(id=id, episode=episode, title=title, \
+            origin=origin, date=date, plot=plot)
+
+        return result
 
 
 class Workers:
