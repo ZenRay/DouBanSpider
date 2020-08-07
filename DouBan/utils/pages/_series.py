@@ -26,11 +26,15 @@ class Details:
     * extract_plot, 提取影视剧情简介
     * extract_tags, 提取豆瓣成员标签
     * extract_recommendation_type, 提取豆瓣推荐的类型，解析的内容页面上提供的"好于"类型的信息
+    * extract_recommendation_item, 提取豆瓣对当前内容推荐对相似条目
     ------如果页面没有演职人员链接时，需要从主页提取相关信息----------
     * extract_directors, 提取导演信息
     * extract_screenwriter, 提取编剧信息
     * extract_actors, 提取演员信息
     """
+    __recommendation_item = namedtuple("recommendation_item", \
+        ["id", "name"])
+
     def __init__(self):
         pass
 
@@ -372,6 +376,25 @@ class Details:
         if result:
             return result
 
+
+    @classmethod
+    def extract_recommendation_item(cls, response):
+        """提取根据当前内容推荐的相关内容
+        """
+        elements = response.css(
+                "div.article > div#recommendations > div.recommendations-bd > dl"
+            )
+
+        if elements:
+            result = []
+            names = [element.css("dd>a:nth-of-type(1)::attr(href)") \
+                .re("subject\/(\d{2,})\/")[0].strip() for element in elements]
+            ids = [element.css("dd>a:nth-of-type(1)::text") \
+                .extract_first().strip() for element in elements]
+            
+            for name, id in zip(names, ids):
+                result.append(cls.__recommendation_item(name=name, id=id))
+            return result
 
     @classmethod
     def extract_cover_url(cls, response):
@@ -739,3 +762,21 @@ class Comments:
             raise ValueConsistenceError(f"can't get review: {response.url}")
 
 
+
+list(Workers.extract_basic(response))
+print()
+list(Workers.extract_duties(response))
+
+for i in dir(Details):
+    if i.startswith("extract"):
+        try:
+            if "title" in i:
+                option = input("输入原始标题:")
+                if not option:
+                    option = None
+                print(f"{i} 结果:\n\t {getattr(Details, i)(response, option)}")
+            else:
+                print(f"{i} 结果:\n\t {getattr(Details, i)(response)}")
+        except Exception as err:
+            print(f"需解决的问题 {err}: {i}")
+            pass
