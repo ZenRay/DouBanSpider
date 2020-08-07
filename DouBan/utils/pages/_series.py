@@ -31,9 +31,19 @@ class Details:
     * extract_directors, 提取导演信息
     * extract_screenwriter, 提取编剧信息
     * extract_actors, 提取演员信息
+
+    Properties:
+    --------------
+    __recommendation_item: 当前内容推荐的其他相关内容，包括豆瓣 ID 和内容标题名称
+    __content_name: 当前内容的名称，name 为页面中条目标题名称，alias 为根据可选名称得到了
+            别名
+    __people: 演职人员信息，ID 演职人员 ID，name 演职人员姓名
     """
     __recommendation_item = namedtuple("recommendation_item", \
         ["id", "name"])
+
+    __content_name = namedtuple("item_name", ["name", "alias"])
+    __people = namedtuple("worker", ["id", "name"])
 
     def __init__(self):
         pass
@@ -60,18 +70,15 @@ class Details:
 
         # * 如果 origin_title 不是缺失的情况下，提取出别名，否则直接返回
         if origin_title is None:
-            result = {"title": title, "alias": None}
+            result = cls.__content_name(name=title, alias=None)
         else:
             # 需要确认 origin_title 是否在提取到的标题中，如果不存在则发生值不一致异常
             if origin_title not in title:
                 raise ValueConsistenceError(
                 f"`title` isn't consistent with `origin_title`. Response URL: {response.url}"
                 )
-            result = {
-                "title": origin_title, 
-                "alias": title.replace(origin_title, "").strip()
-            }
-        
+            result = cls.__content_name(name=origin_title, \
+                alias=title.replace(origin_title, "").strip())
         return result
 
 
@@ -216,7 +223,7 @@ class Details:
             
             # 拼接数据值以及删除多余的空格
             if additional:
-                result += "/" + additional.replace(" / ", "/")
+                result += additional.replace(" / ", "/")
 
         if result:
             result = result.strip()
@@ -303,7 +310,7 @@ class Details:
         # 如果类型是导演存在，再查询到导演信息
         if Details.check_attribute(response, name="导演", \
             query="div#info > span:nth-of-type(1) > span::text"):
-            result = {}
+            result = []
 
             # 遍历导演以及豆瓣导演 ID
             names = response.css(
@@ -314,7 +321,7 @@ class Details:
                 ).extract()
             for name, id_ in zip(names, ids_):
                 id_ = None if "search_text" in id_ else re.search(r"\d+", id_).group().strip()
-                result[name.strip()] = id_
+                result.append(cls.__people(id=id_, name=name.strip()))
 
             return result
 
@@ -326,7 +333,7 @@ class Details:
         # 如果类型是编剧存在，再查询编剧信息
         if Details.check_attribute(response, name="编剧", \
             query="div#info > span:nth-of-type(2) > span::text"):
-            result = {}
+            result = []
 
             names = response.css(
                     "div#info > span:nth-of-type(2) > span.attrs > a::text"
@@ -337,7 +344,7 @@ class Details:
                 ).extract()
             for name, id_ in zip(names, ids_):
                 id_ = None if "search_text" in id_ else re.search(r"\d+", id_).group().strip()
-                result[name.strip()] = id_
+                result.append(cls.__people(name=name.strip(), id=id_))
 
             return result
 
@@ -349,7 +356,7 @@ class Details:
         # 如果类型是编剧存在，再查询编剧信息
         if Details.check_attribute(response, name="主演", \
             query="div#info > span:nth-of-type(3) > span::text"):
-            result = {}
+            result = []
 
             names = response.css(
                     "div#info > span:nth-of-type(3) > span.attrs > a::text"
@@ -361,7 +368,7 @@ class Details:
 
             for name, id_ in zip(names, ids):
                 id_ = None if "search_text" in id_ else re.search(r"\/(\d{2,})\/", id_).group(1).strip()
-                result[name.strip()] =  id_
+                result.append(cls.__people(name=name.strip(), id=id_))
 
             return result
 
@@ -432,7 +439,16 @@ class Workers:
     可以得到内容的链接为 https://movie.douban.com/subject/{影视 ID}/celebrities
     * extract_basic, 解析影视演职人员基本信息，包括需要的中文信息和别名，以及豆瓣提供的 ID
     * extract_duties, 解析演职人员id 和对应的岗位
+
+    Properties:
+    -------------
+    __worker: 演职人员基本信息，id 为演职人员 ID，name 为演职人员姓名，alias 为演职人员的
+        非中文名称，url 为演职人员的详情页链接
+    __worker_duty: 演职人员职责信息，pid 为当前影片的 ID，id 为演职人员 ID，duty 为演职人
+        员岗位，action 为演员参与到影片的方式，role 为演员在影片中的角色姓名
     """
+    __worker = namedtuple("worker", ["id", "name", "alias", "url"])
+    __worker_duty = namedtuple("duty", ["pid", "id", "duty", "action", "role"])
     @classmethod
     def extract_basic(cls, response):
         """提取演职人员基本信息
@@ -462,7 +478,7 @@ class Workers:
                 else:
                     alias = None
     
-                yield id, name, alias, url
+                yield cls.__worker(id=id, name=name, alias=alias, url=url)
             
 
     @classmethod
@@ -487,10 +503,12 @@ class Workers:
 
             if roles and actions:
                 for id, role, action in zip(ids, roles, actions):
-                    yield product_id, id, duty, action, role
+                    yield cls.__worker_duty(pid=product_id, id=id, duty=duty, \
+                        action=action, role=role)
             else:
                 for id in ids:
-                    yield product_id, id, duty, None, None
+                    yield cls.__worker_duty(pid=product_id, id=id, duty=duty, \
+                        action=None, role=None)
 
 
 class Pictures:
@@ -500,10 +518,15 @@ class Pictures:
 
     # * extract_poster, 提取海报信息
     # * extract_wallpaper, 提取壁纸信息
+
+    Properties:
+    -------------
+    __poster: 海报信息, id 为海报的 ID，url 为海报的链接，description 为海报的描述信息，
+        可能包括一些使用区域等描述，specification 为海报的规格信息
+    __wallpaper: 壁纸信息，id 为壁纸的 ID，url 为壁纸的链接，specification 为壁纸规格信息
     """
     __poster = namedtuple("poster", ["id", "url", "description", "specification"])
     __wallpaper = namedtuple("wallpaper", ["id", "url", "specification"])
-    __slots__ = ()
     @classmethod
     def extract_poster(cls, response):
         """
@@ -588,6 +611,16 @@ class Comments:
 
     解析长评论信息
     解析长评论信息，长评论链接：https://movie.douban.com/subject/<影视 ID>/reviews
+
+    Properties:
+    -------------
+    __short: 影片短评，name 用户姓名，uid 用户链接，upic 用户头像，date 用户评论日期
+        cid 用户评论 ID，content 用户评论的内容，thumb 赞同该评论用户，watched 用户是否已
+        经观看-因为影片的评论包括了想看和已看两种类型
+    __review: 影片评论，针对影片发表长评论。name 用户姓名，uid 用户链接，upic 用户头像，
+        date 用户评论日期，cid 用户评论 ID，short_content 用户评论的部分内容（完整内容需要
+        请求其他页面），title 评论标题，contetn_url 可以获取到详细评论的 URL，thumb 赞同
+        该评论的数量，down 不赞同该评论的数量，reply 回复该评论的数量
     """
     __short = namedtuple("short_comment", \
         ["name", "uid", "upic", "date", "cid", "rate", "content", "thumb", "watched"])
@@ -762,21 +795,3 @@ class Comments:
             raise ValueConsistenceError(f"can't get review: {response.url}")
 
 
-
-list(Workers.extract_basic(response))
-print()
-list(Workers.extract_duties(response))
-
-for i in dir(Details):
-    if i.startswith("extract"):
-        try:
-            if "title" in i:
-                option = input("输入原始标题:")
-                if not option:
-                    option = None
-                print(f"{i} 结果:\n\t {getattr(Details, i)(response, option)}")
-            else:
-                print(f"{i} 结果:\n\t {getattr(Details, i)(response)}")
-        except Exception as err:
-            print(f"需解决的问题 {err}: {i}")
-            pass
