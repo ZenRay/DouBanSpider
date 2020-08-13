@@ -3,6 +3,7 @@
 
 -- ----------------------------
 -- Table structure for list_series
+-- 作为基本信息存储
 -- ----------------------------
 DROP TABLE IF EXISTS `list_series`;
 CREATE TABLE `list_series` (
@@ -14,6 +15,8 @@ CREATE TABLE `list_series` (
   `url` varchar(500) NOT NULL COMMENT '电视剧详情页链接',
   `cover_link`  varchar(500) COMMENT '海报链接',
   `crawled` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已经爬取',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
   PRIMARY KEY (`id`),
   UNIQUE KEY `sid` (`series_id`) COMMENT '电视剧实际 ID 作为唯一约束'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='电视剧列表信息表';
@@ -32,7 +35,7 @@ CREATE TABLE `series_info` (
   `rate` decimal(2, 1) DEFAULT 0 COMMENT '豆瓣影视评分',
   `rate_collection` INT UNSIGNED DEFAULT 0 COMMENT '豆瓣影视评论人数',
   `main_tag` varchar(10) DEFAULT NULL COMMENT '豆瓣影视主要类型标签 eg:电影、电视剧、综艺、动漫、纪录片以及短片',
-  `category` varchar(200) DEFAULT NULL COMMENT '豆瓣影视类型，例如 恐怖、动作等',
+  `genres` varchar(200) DEFAULT NULL COMMENT '豆瓣影视类型，例如 恐怖、动作等',
   `product_country` varchar(100) DEFAULT NULL COMMENT '豆瓣影视制片国家',
   `language` varchar(100) DEFAULT NULL COMMENT '豆瓣影视语言',
   `release_year` YEAR DEFAULT NULL COMMENT '豆瓣影视成片年份',
@@ -45,6 +48,9 @@ CREATE TABLE `series_info` (
   `actors` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目中演员，使用 / 分隔',
   `plot` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目剧情简介',
   `cover` varchar(150) DEFAULT NULL COMMENT '豆瓣影视条目中封面海报链接',
+  `official_site` varchar(200) DEFAULT NULL COMMENT '影视条目上的官方网站',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
   PRIMARY KEY (`id`),
   UNIQUE KEY `sid` (`series_id`) COMMENT '豆瓣影视实际 ID 作为唯一约束'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='影视列表信息表';
@@ -62,6 +68,26 @@ CREATE TABLE `series_episode` (
   `origin_title` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '豆瓣影视剧集原始标题，主要是一类国外剧集的标题',
   `date` varchar(100) DEFAULT NULL COMMENT '豆瓣剧集上映日期',
   `plot` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目多季剧集剧情简介',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
   PRIMARY KEY (`id`),
   UNIQUE KEY `seid` (`series_id`, `episode`) COMMENT '豆瓣影视实际 ID 和剧集集数作为唯一约束'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='影视多季各集信息表';
+
+
+-- ----------------------------
+-- Table structure for series_temp
+-- 外源信息临时存储表，存储信息包括三个主要信息，影视条目信息、标题以及主要的类型标签
+-- ----------------------------
+DROP TABLE IF EXISTS `series_temp`;
+CREATE TABLE `series_temp` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `series_id` varchar(20) NOT NULL COMMENT '豆瓣影视剧条目 ID',
+  `title` varchar(150) NOT NULL COMMENT '豆瓣影视标题',
+  `main_tag` varchar(10) DEFAULT NULL COMMENT '豆瓣影视主要类型标签 eg:电影、电视剧、综艺、动漫、纪录片以及短片',
+  `status` boolean DEFAULT 0 COMMENT '该条目信息是否已经爬取，默认为 0 未爬取，1 为已爬取',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `sid` (`series_id`) COMMENT '豆瓣影视实际 ID 作为唯一约束'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='外源信息临时存储表';
