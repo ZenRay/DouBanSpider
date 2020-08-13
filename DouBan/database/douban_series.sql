@@ -83,8 +83,8 @@ DROP TABLE IF EXISTS `series_temp`;
 CREATE TABLE `series_temp` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `series_id` varchar(20) NOT NULL COMMENT '豆瓣影视剧条目 ID',
-  `title` varchar(150) NOT NULL COMMENT '豆瓣影视标题',
-  `main_tag` varchar(10) DEFAULT NULL COMMENT '豆瓣影视主要类型标签 eg:电影、电视剧、综艺、动漫、纪录片以及短片',
+  `title` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '豆瓣影视标题',
+  `main_tag` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视主要类型标签 eg:电影、电视剧、综艺、动漫、纪录片以及短片',
   `status` boolean DEFAULT 0 COMMENT '该条目信息是否已经爬取，默认为 0 未爬取，1 为已爬取',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
