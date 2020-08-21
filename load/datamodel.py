@@ -13,13 +13,13 @@ Base = declarative_base()
 
 
 
-class TempItem(Base):
+class DouBanSeriesSeedItem(Base):
     """外源信息临时表
 
     外源信息临时表，用于存储需要影视信息种子源。表名是 `series_temp`，schema 信息可以通过
     `douban_series.sql` 文件中确认
     """
-    __tablename__ = "series_temp"
+    __tablename__ = "series_seed"
     id = sqlalchemy.Column(sqlalchemy.BigInteger, primary_key=True, autoincrement=True)
     series_id = sqlalchemy.Column(sqlalchemy.VARCHAR(length=20, convert_unicode=True), nullable=False, unique=True)
     title = sqlalchemy.Column(sqlalchemy.VARCHAR(150, convert_unicode=True, collation="utf8mb4"), nullable=False)
