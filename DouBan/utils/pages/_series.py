@@ -28,6 +28,8 @@ class Details:
     * extract_recommendation_type, 提取豆瓣推荐的类型，解析的内容页面上提供的"好于"类型的信息
     * extract_recommendation_item, 提取豆瓣对当前内容推荐对相似条目
     * extract_episode_info, 提取电视剧的各集剧情信息
+    * extract_main_tag, 提取影视属于哪些主标签，例如: 电影、电视剧、综艺、动漫、纪录片以及短片，
+        因为种子内容难以解析到具体到数据，直接简要的分类为 电视剧和电影两种类型
     ------如果页面没有演职人员链接时，需要从主页提取相关信息----------
     * extract_directors, 提取导演信息
     * extract_screenwriter, 提取编剧信息
@@ -500,6 +502,18 @@ class Details:
             origin=origin, date=date, plot=plot)
 
         return result
+
+
+    @classmethod
+    def extract_main_tag(cls, response):
+        """提取主要类型
+
+        只需要保留为电视剧和电影两个主要即可
+        """
+        return  response.xpath(
+            "//a[contains(text(), '分享到')]/attribute::data-type"
+        ).extract_first()
+        
 
 
 class Workers:
