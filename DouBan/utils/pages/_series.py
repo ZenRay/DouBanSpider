@@ -864,3 +864,135 @@ class Comments:
             raise ValueConsistenceError(f"can't get review: {response.url}")
 
 
+
+class People:
+    """解析演职人员 Profile
+
+    解析演职人员的具体信息，解析信息的链接:
+    https://movie.douban.com/celebrity/<演职人员 id>/
+
+    Methods:
+    -----------
+    * extract_bio_informaton: 获取演职人员相关信息
+    * extract_text: 辅助方法，利用 xpath 的判断元素中文本是否为对应的之值，在获取其兄弟文本内容
+        是一个静态方法
+
+
+    Properties:
+    -----------
+    __bio: 演职人员具体的信息，直接获取演职人员页面信息，包括
+        * id 豆瓣数据中的 id
+        * name 姓名，豆瓣标题显示姓名
+        * gender 性别
+        * constellation 星座
+        * birthdate 出生日期
+        * birthplace 出生地
+        * profession 职业
+        * alias 其他姓名
+        * alias_cn 其他中文姓名（翻译）
+        * family 家庭成员
+        * imdb_link IMBD 数据中的链接
+        * official_web 官方网站
+        * introduction 简介
+    """
+    __bio = namedtuple("bio", \
+        ["id", "name", "gender", "constellation", "birthdate", "birthplace", "profession", \
+            "alias", "alias_cn", "family", "imdb_link", "official_web", "introduction"])
+    
+    @classmethod
+    def extract_bio_informaton(cls, response):
+        """解析基本的信息
+
+        从演职人员页面中得到进行解析，得到如下数据：
+            * id 豆瓣数据中的 id
+            * name 姓名，豆瓣标题显示姓名
+            * gender 性别
+            * constellation 星座
+            * birthdate 出生日期
+            * birthplace 出生地
+            * profession 职业
+            * alias 其他姓名
+            * alias_cn 其他中文姓名（翻译）
+            * family 家庭成员
+            * imdb_link IMBD 数据中的链接
+            * official_web 官方网站
+            * introduction 简介
+        """
+        id_ = re.search("celebrity\/(\d{2,})\/", response.url).group(1)
+        
+        name = response.css("head > title::text") \
+                        .extract_first().replace("(豆瓣)", "") \
+                        .strip()
+    
+        gender = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='性别']/following-sibling::text()")
+
+        constellation = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='星座']/following-sibling::text()")
+
+        birthdate = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='出生日期']/following-sibling::text()")
+
+        birthplace = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='出生地']/following-sibling::text()")
+        
+        profession = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='职业']/following-sibling::text()")
+
+        alias = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='更多外文名']/following-sibling::text()")
+
+        alias_cn = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='更多中文名']/following-sibling::text()")
+
+        family = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='家庭成员']/following-sibling::text()")
+
+        imdb_link = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='imdb编号']/following-sibling::text()")
+        
+        official_web = cls.extract_text(response, sub_option=": ", \
+            query="//span[text()='官方网站']/following-sibling::text()")
+
+        # 解析任务简介
+        element = response.css("div.article div#intro > div.bd > span.all::text").extract()
+        
+        if element:
+            introduction = "\n".join(i.strip() for i in element)
+        else:
+            introduction = response.css("div.article div#intro > div.bd::text") \
+                .extract_first()
+            # 解析到数据之后删除多余字符
+            if introduction.strip():
+                introduction = introduction.strip()
+            else:
+                introduction = None
+            
+        return cls.__bio(name=name, gender=gender, constellation=constellation, \
+            birthdate=birthdate, birthplace=birthplace, profession=profession, \
+            alias=alias, alias_cn=alias_cn, family=family, imdb_link=imdb_link, \
+                official_web=official_web, introduction=introduction, id=id_)
+
+
+    @staticmethod
+    def extract_text(response, query, sub_option=None):
+        """提取指定 Tag 中的值
+
+        从 response 中获取到响应的值，如果找到了相关的值，再利用 sub_option 中的值去删除相关
+        字符。为了保证简洁性，使用 xpath 作为 query
+
+        Args:
+        ---------
+        response: URL 响应的页面
+        query: str, xpath 查询语句
+        sub_option: str, regex 的表达式
+        """
+        text = response.xpath(query).extract_first()
+        
+        if text:
+            if sub_option is None:
+                text = text.strip().replace(" / ", "/")
+            else:
+                text = re.sub(sub_option, "", text).strip().replace(" / ", "/")
+
+        return text
