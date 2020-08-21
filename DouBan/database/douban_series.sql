@@ -28,7 +28,7 @@ CREATE TABLE `list_series` (
 -- ----------------------------
 DROP TABLE IF EXISTS `series_info`;
 CREATE TABLE `series_info` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
+  -- `id` bigint NOT NULL AUTO_INCREMENT,
   `series_id` varchar(20) NOT NULL COMMENT '豆瓣影视剧条目 ID',
   `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '豆瓣影视名称',
   `alias` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视别名',
@@ -49,13 +49,16 @@ CREATE TABLE `series_info` (
   `plot` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目剧情简介',
   `cover` varchar(150) DEFAULT NULL COMMENT '豆瓣影视条目中封面海报链接',
   `official_site` varchar(200) DEFAULT NULL COMMENT '影视条目上的官方网站',
+  `recommendation_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '影视条目上的官方网站',
+  `recommendation_item` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '提取豆瓣对当前内容推荐对相似条目',
+  `episode_info` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '提取电视剧的各集剧情信息',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `sid` (`series_id`) COMMENT '豆瓣影视实际 ID 作为唯一约束'
+  PRIMARY KEY (`series_id`)
+  -- UNIQUE KEY `sid` (`series_id`) COMMENT '豆瓣影视实际 ID 作为唯一约束'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='影视列表信息表';
 
-
+    
 -- ----------------------------
 -- Table structure for series_episode
 -- ----------------------------

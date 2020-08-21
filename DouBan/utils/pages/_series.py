@@ -15,7 +15,7 @@ class Details:
     * extract_rate, 提取影视评分
     * extract_rate_collections, 提取影视评分人数
     * extract_cover_url, 提取影视详情页的海报链接
-    * extract_category, 提取类型信息
+    * extract_genres, 提取类型信息
     * extract_product_country, 提取制片国家信息
     * extract_language, 提取语言信息
     * extract_release_year, 提取成片年份
@@ -124,7 +124,7 @@ class Details:
 
 
     @classmethod
-    def extract_category(cls, response):
+    def extract_genres(cls, response):
         """提取类型信息
         
         如果存在多个类型，使用 slash 分隔
