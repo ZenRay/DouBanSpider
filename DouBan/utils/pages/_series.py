@@ -7,7 +7,7 @@ import datetime
 from collections import namedtuple
 from DouBan.utils.exceptions import LostArgument, ValueConsistenceError
 
-__all__ = ["Details", "Workers", "Pictures", "Comments", "People"]
+__all__ = ["Details", "Workers", "Pictures", "Comments", "People", "Awards"]
 class Details:
     """
     豆瓣影视内容详情页解析，主要功能是解决 Scrapy 得到 response 之后进行页面解析，得到相应的结果:
@@ -163,9 +163,12 @@ class Details:
         """
         result = response.xpath(
             "//div[@id='info']//span[text()='语言:']/following-sibling::text()"
-        ).extract_first().strip()
+        ).extract_first()
         
-        return  result.replace(" / ", "/")
+        if result:
+            result = result.strip().replace(" / ", "/")
+        
+        return result
 
 
     @classmethod
@@ -202,7 +205,10 @@ class Details:
                 continue
             
             value = date.group().strip()
-            if country.group() in result:
+            # 如果没有对应的国家，直接使用 index 来替代
+            if country is None:
+                result[index] = value
+            elif country.group() in result:
                 key = f"{country.group(1).strip()}_{index}"
                 result[key] = value
             else:
@@ -419,9 +425,9 @@ class Details:
 
         if elements:
             result = []
-            names = [element.css("dd>a:nth-of-type(1)::attr(href)") \
+            ids = [element.css("dd>a:nth-of-type(1)::attr(href)") \
                 .re("subject\/(\d{2,})\/")[0].strip() for element in elements]
-            ids = [element.css("dd>a:nth-of-type(1)::text") \
+            names = [element.css("dd>a:nth-of-type(1)::text") \
                 .extract_first().strip() for element in elements]
             
             for name, id in zip(names, ids):
@@ -432,9 +438,15 @@ class Details:
     def extract_cover_url(cls, response):
         """提取详情页海报链接
         """
-        return response.css(
-                "div#mainpic > a > img[title='点击看更多海报']::attr(src)"
-            ).extract_first().strip()
+        link = response.xpath(
+            "//div[@id='mainpic']/a/img[contains(attribute::title, '点击看更多海报')]" + 
+            "/attribute::src | //div[@id='mainpic']/a/img[contains(attribute::title," +
+            " '点击看大图')]/attribute::src"
+        ).extract_first()
+        
+        if link:
+            link = link.strip()
+        return link
 
 
     @staticmethod
@@ -530,6 +542,16 @@ class Details:
         """
         return  response.xpath(
             "//a[contains(text(), '分享到')]/attribute::data-type"
+        ).extract_first()
+
+
+    @classmethod
+    def extract_official_web(cls, response):
+        """提取豆瓣影视专题网站链接
+
+        """
+        return response.xpath(
+            "//div[@id='info']/span[contains(text(), '官方小站')]/following::a/attribute::href"
         ).extract_first()
         
 
@@ -1028,3 +1050,60 @@ class People:
                 text = re.sub(sub_option, "", text).strip().replace(" / ", "/")
 
         return text
+
+
+
+class Awards:
+    """影视获奖信息
+
+    解析演职人员的具体信息，解析信息的链接:
+    https://movie.douban.com/subject/<影视 ID>/awards/
+
+    Methods:
+    -----------
+    * extract_awards: 获取影视获奖信息
+
+    Properties:
+    -----------
+    __award: 演职人员具体的信息，直接获取演职人员页面信息，包括
+        * host 颁奖主办方
+        * year 获奖年份
+        * name 奖项类型名称
+        * person 获奖人姓名
+        * status 最终获奖状态, 1 为获奖，0 表示只有提名
+    """
+    __award = namedtuple("award", \
+        ["host", "year", "name", "person", "status"])
+
+    @classmethod
+    def extract_awards(cls, response):
+        result = []
+
+        for element in response.css("div.article > div.awards"):
+            host = element.css("div.hd a::text").extract_first()
+            year = element.css("div.hd >h2 > span::text").re("\d+")[0]
+            
+            names = element.css("ul.award > li:first-of-type::text").extract()
+
+            # 姓名列表
+            people_list = element.css("ul.award > li:nth-of-type(2)")
+            # 需要判断是否有获奖人员信息，如果有信息需要解析出姓名和 ID
+            for name, lis in zip(names, people_list):
+                status = 0 if "(提名)" in name else 1
+                if lis.css("a::text"):
+                    urls = lis.css("a::attr(href)").extract()
+                    persons = lis.css("a::text").extract()
+                    for url, person in zip(urls, persons):
+                        result.append(
+                            cls.__award(host=host, year=year, name=name, \
+                                status=status, person=json.dumps(
+                                {"id": re.search("celebrity/(\d+)", url).group(1), "name":person},
+                                ensure_ascii=False))
+                        )
+                # 没有人员信息
+                else:
+                    result.append(
+                        cls.__award(host=host, year=year, name=name, \
+                            status=status, person=None)
+                    )
+        return result
