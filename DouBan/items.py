@@ -24,35 +24,29 @@ class ListItem(scrapy.Item):
 class DoubanDataItem(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
-    url = scrapy.Field()
-    id = scrapy.Field() # 源数据的 ID
-    title = scrapy.Field() # 名称
-    release_year = scrapy.Field() # 标题中上映年份
-    rate = scrapy.Field() # 评分
-    director = scrapy.Field() # 导演
-    screenwriter = scrapy.Field() # 编剧
-    actors = scrapy.Field() # 演员
-    play_location = scrapy.Field() # 上映日期中的国家
-    category = scrapy.Field()   # 类型
-    play_year = scrapy.Field()  # 上映日期中国的时间
-    play_duration = scrapy.Field()  # 播放时间
-    nick_name = scrapy.Field()  # 别名
-    product_country = scrapy.Field()    # 制片地区
-    language = scrapy.Field()       # 语言
-    imdb = scrapy.Field()       # IMDB 链接
-    introduction = scrapy.Field()   # 简介
-    worker_detail = scrapy.Field()  # 主要演职人员信息， JSON 数据
-    award_amount = scrapy.Field()   # 获奖数量
-    short_comment = scrapy.Field()  # 短评信息，JSON 数据
-    long_comment = scrapy.Field()   # 长评论信息，JSON 数据
-    tags = scrapy.Field()           # 标签
-    rate_collections = scrapy.Field()   # 评论人员数量
-
-    # 辅助字段信息
-    actors_id = scrapy.Field()  # 需要提取演员的 ID
-    director_id = scrapy.Field()    # 需要提取导演的 ID
-    video_id = scrapy.Field()       # 需要提取 video 的 ID
-    cover_page = scrapy.Field()     # 影视海报
+    series_id = scrapy.Field() # 豆瓣影视 ID
+    name = scrapy.Field()
+    alias = scrapy.Field()
+    rate = scrapy.Field()
+    rate_collection = scrapy.Field()
+    main_tag = scrapy.Field() # 豆瓣影视主要类型标签 eg:电影、电视剧、综艺、动漫、纪录片以及短片
+    genres = scrapy.Field() # 豆瓣影视类型，例如 恐怖、动作等
+    product_country = scrapy.Field()
+    language = scrapy.Field()
+    release_year = scrapy.Field()
+    release_date = scrapy.Field()   # 豆瓣影视上映日期，不同的国家可能日期不同
+    play_duration = scrapy.Field()  # 豆瓣影视播放时长，可能不同回家版本存在不同时长
+    imdb_id = scrapy.Field()    # IMDB 数据中的 ID
+    tags = scrapy.Field()   # 豆瓣影视中豆瓣成员常用标签 实际可能为豆瓣处理得到的结果
+    directors = scrapy.Field()  # 豆瓣影视条目中导演，使用 / 分隔
+    screenwriters = scrapy.Field() # 豆瓣影视条目中编剧，使用 / 分隔
+    actors = scrapy.Field() # 豆瓣影视条目中演员，使用 / 分隔
+    plot = scrapy.Field()   # 豆瓣影视条目剧情简介
+    cover = scrapy.Field()  # 豆瓣影视条目中封面海报链接
+    cover_content = scrapy.Field()  # 豆瓣影视海报链接请求后的 content，避免后续无法请求的情况
+    official_site = scrapy.Field()  # 影视条目上的官方网站
+    recommendation_type = scrapy.Field()
+    recommendation_item = scrapy.Field()
 
 
 
