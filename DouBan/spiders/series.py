@@ -9,19 +9,26 @@ import sys
 import re
 import redis
 import configparser
+import base64
 
 import numbers
 from os import path, remove
 from pyquery import PyQuery
 from lxml import etree
 from urllib import parse
-from DouBan.items import CoverImageItem, DoubanDataItem, ListItem
+from DouBan.items import (
+    CoverImageItem, DouBanDetailItem, ListItem, DouBanAwardItem, DouBanWorkerItem
+)
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
 from DouBan.settings import DATABASE_CONF
 
 from DouBan.utils.exceptions import ConnectionError
+from DouBan.utils.pages import *
+
 from scrapy.exceptions import IgnoreRequest
+
+
 
 logger = logging.getLogger("Douban " + __name__)
 
@@ -30,19 +37,18 @@ global_config = configparser.ConfigParser()
 __filepath = path.join(path.dirname(__file__), "../../scrapy.cfg")
 
 if path.exists(__filepath):
-    with open(__filepath, "r") as file:
-        global_config.read_file(file)
-        series = None
-        # if there is addictive file, get the movies url list
-        if global_config.has_option("addictive_series_file", "path"):
-            filename = path.join(path.dirname(__filepath), global_config.get("addictive_series_file", "path"))
-            if path.exists(filename):
-                with open(filename, "r") as mfile:
-                    series = [i.strip() for i in mfile.readlines()]
+    global_config.read(__filepath)
+    series = None
+    # if there is addictive file, get the movies url list
+    if global_config.has_option("addictive_series", "path"):
+        filename = path.join(path.dirname(__filepath), global_config.get("addictive_series", "path"))
+        if path.exists(filename):
+            with open(filename, "r") as mfile:
+                series = [i.strip() for i in mfile.readlines()]
 
-                # if delete file option is True, delete file
-                if global_config.getboolean("addictive_series_file", "delete"):
-                    remove(filename)
+            # if delete file option is True, delete file
+            if global_config.getboolean("addictive_series", "delete"):
+                remove(filename)
 
 
 class SeriesSpider(scrapy.Spider):
@@ -56,21 +62,39 @@ class SeriesSpider(scrapy.Spider):
     end_pages = 500
     _start_url = "https://movie.douban.com/j/search_subjects?type=tv&tag={tag}&sort=time&page_limit=20&page_start={page}"
     
-
+    # 配置文件传输，设置为属性方式传递
+    config = global_config
     def start_requests(self):
         """
-        如果存在待处理的 sereis 信息，优先处理
+        如果存在待处理的 series 信息，优先处理
         """
         if series:
             for url in series:
                 yield scrapy.Request(url, callback=self.direct_parse_page)
         
+
         # TODO: 需要完成对存储在表中的电视剧内容进行爬去和解析——用于解析详情内容
-        if global_config.getboolean("addictive_series_file", "check_table"):
-            pass
+        if global_config.getboolean("addictive_series", "check_table"):
+            # 数据管理对象
+            from DouBan.database.manager import DataBaseManipulater
+            from DouBan.database.manager.datamodel import DouBanSeriesSeed
+            manipulater = DataBaseManipulater(echo=True)
+            url = "https://movie.douban.com/subject/{seed}/"
+            # 从种子数据库中提取未爬取的数据
+            with manipulater.get_session() as session:
+                seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0)
+                # ! debugger
+                # import numpy as np
+                for seed in seeds.all():
+                    yield scrapy.Request(url.format(seed=seed.series_id), \
+                        callback=self.detail_page, meta={"session": session})
+                    
+                    # ! Debugger
+                    break
+
 
         # * 仅获取到电视剧相关页面的内容保存到数据库以备下一步解析用，不需要进行下一级页面解析
-        if global_config.getboolean("addictive_series_file", "crawl_new"):
+        if global_config.getboolean("addictive_series", "crawl_new"):
             for tag in self.tags:
                 start = 0
                 while start <= self.end_pages:
@@ -98,7 +122,7 @@ class SeriesSpider(scrapy.Spider):
             item["url"] = element["url"]
             item["list_id"] = element["id"]
             item["cover_url"] = element["cover"]
-            item["rate"] = float(element["rate"]) if len(element["rate"])>0 else None
+            item["rate"] = float(element["rate"]) if len(element["rate"]) > 0 else None
             
             yield item
 
@@ -107,6 +131,115 @@ class SeriesSpider(scrapy.Spider):
         """
         处理详情页面的内容
         """
+        # from scrapy.shell import inspect_response
+        # inspect_response(response, self)
+        item = DouBanDetailItem()
+        item["series_id"] = re.search("subject/(\d{3,})", response.url).group(1)
+        item["name"] = Details.extract_title(response).name
+        item["alias"] = Details.extract_nick_name(response)
+        item["rate"] = Details.extract_rate(response)
+        item["rate_collection"] = Details.extract_rate_collections(response)
+        # 需要在后续根据分类页面的内容重新调整，目前暂时只提取电视剧和电影的分类
+        item["main_tag"] = Details.extract_main_tag(response)
+        item["genres"] = Details.extract_genres(response)
+        item["product_country"] = Details.extract_product_country(response)
+        item["language"] = Details.extract_language(response)
+        item["release_year"] = Details.extract_release_year(response)
+
+        # 如果能提取到日期数据，转换为 JSON 数据
+        item["release_date"] = json.dumps(Details.extract_release_date(response), \
+            ensure_ascii=False)
+
+        item["play_duration"] = Details.extract_play_duration(response)
+        item["imdb_id"] = Details.extract_imdb_id(response)
+        item["tags"] = Details.extract_tags(response) 
+
+        directors = Details.extract_directors(response)
+        if directors:
+            item["directors"] = "/".join(i.name for i in directors)
+        else:
+            item["directors"] = None
+
+        screenwriters = Details.extract_screenwriter(response)
+        if screenwriters:
+            item["screenwriters"] = "/".join(i.name for i in screenwriters)
+        else:
+            item["screenwriters"] = None
+        
+        actors = Details.extract_actors(response)
+        if actors:
+            item["actors"] = "/".join(i.name for i in actors)
+        else:
+            item["actors"] = None
+
+        item["plot"] = Details.extract_plot(response)
+        item["cover"] = Details.extract_cover_url(response)
+        
+        # * 根据 crawl_img 选项判断是否需要将图片链接转换为实际请求的内容
+        if global_config.getboolean("addictive_series", "crawl_img"):
+            res = requests.get(item.cover)
+            if int(res.status_code) == 200:
+                item["cover_content"] = base64.b64encode(res.content)
+            else:
+                logger.debug(f"Request Image content failed:{item.cover}")
+                item["cover_content"] = None
+
+        item["official_site"] = Details.extract_official_web(response)
+
+        item["recommendation_type"] = Details.extract_recommendation_type(response)
+        recommendation_items = Details.extract_recommendation_item(response) 
+
+        if recommendation_items:
+            item["recommendation_item"] = json.dumps(
+                {i.id:i.name for i in recommendation_items}, ensure_ascii=False
+            )
+        else:
+            item["recommendation_item"] = None
+        yield item
+        # import ipdb; ipdb.set_trace()
+        # 请求获奖详细列表信息
+        if response.css("div.mod").re("获奖情况"):
+            url = f"https://movie.douban.com/subject/{item['series_id']}/awards/"
+            yield scrapy.Request(url, callback=self.parse_awards)
+
+        # 请求演职人员信息
+        if response.css("div.celebrities").re("演职员"):
+            url = f"https://movie.douban.com/subject/{item['series_id']}/celebrities"
+            yield scrapy.Request(url, callback=self.parse_worker)
+
+
+    def parse_awards(self, response):
+        """解析获奖信息
+        """
+        item = DouBanAwardItem()
+        for award in Awards.extract_awards(response):
+            item["sid"] = re.search("subject/(\d+)", response.url).group(1)
+            item["host"] = award.host
+            item["year"] = award.year
+            item["name"] = award.name
+            item["person"] = award.person
+            item["status"] = award.status
+
+            yield item
+
+
+    def parse_worker(self, response):
+        """解析演职人员信息
+        """
+        item = DouBanWorkerItem()
+        # 对演员的角色进行调整，使用 mapping 加快搜索
+        duties = {duty.id:duty for duty in Workers.extract_duties(response)}
+
+        for worker in Workers.extract_basic(response):
+            item["wid"] = worker.id
+            item["name"] = worker.name
+            item["alias"] = worker.alias
+            item["sid"] = re.search("subject/(\d{3,})", response.url).group(1)
+            item["duty"] = duties[worker.id].duty if duties.get(worker.id) else None
+            item["action"] = duties[worker.id].action if duties.get(worker.id) else None
+            item["role"] = duties[worker.id].role if duties.get(worker.id) else None
+
+            yield item
 
 
     def parse(self, response):

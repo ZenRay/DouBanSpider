@@ -12,13 +12,17 @@ import json
 from os import path
 from scrapy.exceptions import DropItem
 
-from DouBan.utils.base import BaseSQLPipeline
+from DouBan.utils.base import BaseSQLPipeline, BasePipeline
 from DouBan.utils.hammers import extract1st_char
-from DouBan.items import DoubanDataItem, CoverImageItem, ListItem
+from DouBan.items import (
+    DouBanDetailItem, DouBanAwardItem, CoverImageItem, ListItem, DouBanWorkerItem
+)
+from DouBan.database.manager.datamodel import *
+from DouBan.database.manager import DataBaseManipulater
 from DouBan.utils.exceptions import InappropriateArgument
 
 cur_path = path.dirname(__file__)
-
+manipulater = DataBaseManipulater()
 class DoubanStoragePipeline(BaseSQLPipeline):
     """Store Data Item Pipeline
     
@@ -199,15 +203,6 @@ class DoubanStoragePipeline(BaseSQLPipeline):
                                 for index, (name, role, url) in \
                         enumerate(zip(*json.loads(item["worker_detail"]).values()))]
         
-        #TODO: 需要完成爬取对应 ID
-        # for index, (name, role, url) in enumerate(zip(
-        #     *json.loads(item["worker_detail"]).values())):
-            # if role != "导演":
-            #     meta = {"id": actors_id[actors_data.index(name)], "name": name}
-            # else:
-            #     meta = {"id": directors_id[directors_data.index(name)], "name": name}
-            
-            # character_role_data.append((item["video_id"], index, name, role, url))
         if len(character_role_data) >= 1:
             insert(character_role_sent, character_role_data, \
             query_step="video_character", single_query=False)
@@ -358,7 +353,7 @@ class ListPipeline(BaseSQLPipeline):
 
 
         # ! 处理完列表页数据，不需要后续在进行处理，直接 DropItem
-        raise DropItem(f"影视详情条目写入完成删除 {item['list_id']}: {item['title']}")
+        raise DropItem(f"影视详情条目写入完成删除 {item['list_id']}: {item['name']}")
 
 
     def close_spider(self, spider):
@@ -366,3 +361,57 @@ class ListPipeline(BaseSQLPipeline):
         self.db_connection.close()
         self.redis_pool.close()
         self.error_file_store.close()
+
+
+
+class DouBanDetailPipeline(BasePipeline):
+    def process_item(self, item, spider):
+        """处理豆瓣影视详情页数据
+
+        """
+        if not isinstance(item, DouBanDetailItem):
+            return item
+        
+        with manipulater.get_session() as session:
+            # 根据全局配置参数 update_table 确认是否需要更新
+            if spider.config.getboolean("addictive_series", "update_table"):
+                temp = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.series_id==item["series_id"]).first()
+                temp.crawled = True
+                session.merge(temp)
+                session.commit()
+                self.log(f"Update Seed Status: {temp.series_id}")
+            
+            data = DouBanSeriesInfo(**item)
+            session.merge(data)
+            session.commit()
+        raise DropItem(f"影视条目写入完成 {item['series_id']}: {item['name']}")
+
+
+
+class DouBanAwardPipeline(BasePipeline):
+    def process_item(self, item, spider):
+        """处理豆瓣影视条目中获奖数据
+        """
+        if not isinstance(item, DouBanAwardItem):
+            return item
+        
+        with manipulater.get_session() as session:
+            data = DouBanSeriesAwards(**item)
+            session.merge(data)
+            session.commit()
+        raise DropItem(f"获奖信息写入完成{item['sid']}")
+
+
+
+class DouBanWorkerPipeline(BasePipeline):
+    def process_item(self, item, spider):
+        """处理豆瓣影视演职人员数据
+        """
+        if not isinstance(item, DouBanWorkerItem):
+            return item
+
+        with manipulater.get_session() as session:
+            data = DouBanSeriesWorker(**item)
+            session.merge(data)
+            session.commit()
+        raise DropItem(f"演职人员信息写入完成{item['sid']}")
