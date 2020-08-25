@@ -7,7 +7,7 @@ import datetime
 from collections import namedtuple
 from DouBan.utils.exceptions import LostArgument, ValueConsistenceError
 
-
+__all__ = ["Details", "Workers", "Pictures", "Comments", "People"]
 class Details:
     """
     豆瓣影视内容详情页解析，主要功能是解决 Scrapy 得到 response 之后进行页面解析，得到相应的结果:
@@ -77,7 +77,14 @@ class Details:
 
         # * 如果 origin_title 不是缺失的情况下，提取出别名，否则直接返回
         if origin_title is None:
-            result = cls.__content_name(name=title, alias=None)
+            name = response.css("head > title::text") \
+                    .extract_first() \
+                    .replace("(豆瓣)", "") \
+                    .strip()
+            
+            alias = title.replace(name, "").strip()
+            
+            result = cls.__content_name(name=name, alias=alias if alias else None)
         else:
             # 需要确认 origin_title 是否在提取到的标题中，如果不存在则发生值不一致异常
             if origin_title not in title:
@@ -315,8 +322,11 @@ class Details:
         理后的字符串
         """
         # 如果类型是导演存在，再查询到导演信息
-        if Details.check_attribute(response, name="导演", \
-            query="div#info > span:nth-of-type(1) > span::text"):
+        # if Details.check_attribute(response, name="导演", \
+        #     query="div#info > span:nth-of-type(1) > span::text"):
+        if response.xpath(
+                "//div[@id='info']/span/span[contains(text(),'导演')]/text()"
+            ).extract_first():
             result = []
 
             # 遍历导演以及豆瓣导演 ID
@@ -338,17 +348,22 @@ class Details:
         """提取页面的编剧信息
         """
         # 如果类型是编剧存在，再查询编剧信息
-        if Details.check_attribute(response, name="编剧", \
-            query="div#info > span:nth-of-type(2) > span::text"):
+        # if Details.check_attribute(response, name="编剧", \
+        #     query="div#info > span:nth-of-type(2) > span::text"):
+        #     result = []
+        if response.xpath(
+                "//div[@id='info']/span/span[contains(text(),'编剧')]/text()"
+            ).extract_first():
+
+            names = response.xpath(
+                    "//div[@id='info']//span[contains(text(),'编剧')]/parent::span/span[@class='attrs']/a/text()"
+                ).extract()
+
+            ids_ = response.xpath(
+                "//div[@id='info']//span[contains(text(),'编剧')]/parent::span/span[@class='attrs']/a/attribute::href"
+            ).extract()
+
             result = []
-
-            names = response.css(
-                    "div#info > span:nth-of-type(2) > span.attrs > a::text"
-                ).extract()
-
-            ids_ = response.css(
-                    "div#info > span:nth-of-type(2) > span.attrs > a::attr(href)"
-                ).extract()
             for name, id_ in zip(names, ids_):
                 id_ = None if "search_text" in id_ else re.search(r"\d+", id_).group().strip()
                 result.append(cls.__people(name=name.strip(), id=id_))
@@ -360,18 +375,21 @@ class Details:
     def extract_actors(cls, response):
         """提取演员信息
         """
-        # 如果类型是编剧存在，再查询编剧信息
-        if Details.check_attribute(response, name="主演", \
-            query="div#info > span:nth-of-type(3) > span::text"):
+        # 如果类型是演员存在，再查询演员信息
+        # if Details.check_attribute(response, name="主演", \
+        #     query="div#info > span:nth-of-type(3) > span::text"):
+        if response.xpath(
+                "//div[@id='info']/span[@class='actor']/span[contains(text(),'主演')]/text()"
+            ).extract_first():
             result = []
 
-            names = response.css(
-                    "div#info > span:nth-of-type(3) > span.attrs > a::text"
+            names = response.xpath(
+                    "//div[@id='info']/span[@class='actor']/span[@class='attrs']/a/text()"
                 ).extract()
 
-            ids = response.css(
-                    "div#info > span:nth-of-type(3) > span.attrs > a::attr(href)"
-                ).extract()
+            ids = response.xpath(
+                "//div[@id='info']/span[@class='actor']/span[@class='attrs']/a/attribute::href"
+            ).extract()
 
             for name, id_ in zip(names, ids):
                 id_ = None if "search_text" in id_ else re.search(r"\/(\d{2,})\/", id_).group(1).strip()
@@ -527,11 +545,11 @@ class Workers:
     -------------
     __worker: 演职人员基本信息，id 为演职人员 ID，name 为演职人员姓名，alias 为演职人员的
         非中文名称，url 为演职人员的详情页链接
-    __worker_duty: 演职人员职责信息，pid 为当前影片的 ID，id 为演职人员 ID，duty 为演职人
+    __worker_duty: 演职人员职责信息，sid 为当前影片的 ID，id 为演职人员 ID，duty 为演职人
         员岗位，action 为演员参与到影片的方式，role 为演员在影片中的角色姓名
     """
     __worker = namedtuple("worker", ["id", "name", "alias", "url"])
-    __worker_duty = namedtuple("duty", ["pid", "id", "duty", "action", "role"])
+    __worker_duty = namedtuple("duty", ["sid", "id", "duty", "action", "role"])
     @classmethod
     def extract_basic(cls, response):
         """提取演职人员基本信息
@@ -586,11 +604,11 @@ class Workers:
 
             if roles and actions:
                 for id, role, action in zip(ids, roles, actions):
-                    yield cls.__worker_duty(pid=product_id, id=id, duty=duty, \
+                    yield cls.__worker_duty(sid=product_id, id=id, duty=duty, \
                         action=action, role=role)
             else:
                 for id in ids:
-                    yield cls.__worker_duty(pid=product_id, id=id, duty=duty, \
+                    yield cls.__worker_duty(sid=product_id, id=id, duty=duty, \
                         action=None, role=None)
 
 
