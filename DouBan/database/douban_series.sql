@@ -59,8 +59,8 @@ CREATE TABLE `series_info` (
   `tags` varchar(100) DEFAULT NULL COMMENT '豆瓣影视中豆瓣成员常用标签 实际可能为豆瓣处理得到的结果',
   `directors` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目中导演，使用 / 分隔',
   `screenwriters` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目中编剧，使用 / 分隔',
-  `actors` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目中演员，使用 / 分隔',
-  `plot` varchar(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目剧情简介',
+  `actors` varchar(400) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目中演员，使用 / 分隔',
+  `plot` varchar(3000) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目剧情简介',
   `cover` varchar(150) DEFAULT NULL COMMENT '豆瓣影视条目中封面海报链接',
   `cover_content` BLOB DEFAULT NULL COMMENT '豆瓣影视海报链接请求后的 content，避免后续无法请求的情况'
   `official_site` varchar(200) DEFAULT NULL COMMENT '影视条目上的官方网站',
@@ -84,7 +84,7 @@ CREATE TABLE `episode_info` (
   `title` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视剧集标题',
   `origin_title` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视剧集原始标题，主要是一类国外剧集的标题',
   `date` varchar(100) DEFAULT NULL COMMENT '豆瓣剧集上映日期',
-  `plot` varchar(600) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目多季剧集剧情简介',
+  `plot` varchar(3000) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视条目多季剧集剧情简介',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
   PRIMARY KEY (`id`),
@@ -107,9 +107,9 @@ CREATE TABLE `worker` (
   `name` varchar(25) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '豆瓣影视演职人员姓名',
   `alias` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视演职人员姓名(非中文)', 
   `sid` varchar(20) NOT NULL COMMENT '豆瓣影视剧条目 ID',
-  `duty` varchar(10) COMMENT '演职人员岗位',
+  `duty` varchar(100) COMMENT '演职人员岗位',
   `action` varchar(5) DEFAULT NULL COMMENT '演员或其他配音演员，参与到影片中到方式',
-  `role` varchar(15) DEFAULT NULL COMMENT '演员或其他配音演员，在影片中的角色',
+  `role` varchar(100) DEFAULT NULL COMMENT '演员或其他配音演员，在影片中的角色',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
   PRIMARY KEY (`wid`),
@@ -138,6 +138,31 @@ CREATE TABLE `picture` (
     REFERENCES series_info(`series_id`)
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='影视海报和壁纸信息';
+
+
+
+-- ----------------------------
+-- Table structure for awards
+-- 存储影视获奖信息
+-- ----------------------------
+DROP TABLE IF EXISTS `awards`;
+CREATE TABLE `awards` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `sid` varchar(20) NOT NULL COMMENT '豆瓣影视剧 ID'
+  `host` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '颁奖主办方',
+  `year` YEAR NOT NULL COMMENT '获奖年份',
+  `name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '获奖类型名称',
+  `person` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '获奖人姓名',
+  `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '最终获奖状态, 1 为获奖，0 表示只有提名'
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
+  PRIMARY KEY (`pid`),
+  FOREIGN KEY (`sid`)
+    REFERENCES series_info(`series_id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='影视获奖信息';
+
+
 
 
 

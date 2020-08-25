@@ -15,7 +15,8 @@ Base = declarative_base()
 
 
 __all__ = ["Base", "DouBanSeriesSeed", "DouBanSeriesList", "DouBanSeriesInfo", \
-    "DouBanEpisodeInfo", "DouBanSeriesWorker", "DouBanSeriesPic", "DouBanSeriesPerson"]
+    "DouBanEpisodeInfo", "DouBanSeriesWorker", "DouBanSeriesPic", "DouBanSeriesPerson", \
+    "DouBanSeriesAwards"]
 class DouBanSeriesSeed(Base):
     """外源信息临时表
 
@@ -148,11 +149,11 @@ class DouBanSeriesInfo(Base):
         comment='豆瓣影视条目中编剧，使用 / 分隔'
     )
     actors = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(150, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.VARCHAR(400, collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目中演员，使用 / 分隔'
     )
     plot = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(300, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.VARCHAR(3000, collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目剧情简介'
     )
     cover = sqlalchemy.Column(
@@ -195,12 +196,11 @@ class DouBanSeriesInfo(Base):
 
     
     def __str__(self):
-        format_ = "<{tbname}(id='{id}', series_id='{series_id}', title=" + \
-            "'{title}', cover='{cover}', create_time='{create_time}')>"
-        items = {key: self.__getattribute__(key) for key in self.__dir__() \
-            if not key.startswith("_")}
+        format_ = "<{tbname} (%s)>".format(tbname=self.__tablename__)
 
-        return format_.format(tbname=self.__tablename__, **items)
+        items = ", ".join(f"{key}='{self.__getattribute__(key)}'" \
+            for key in self.__dir__() if not key.startswith("_"))
+        return format_ % items
 
     
     def __eq__(self, other):
@@ -220,7 +220,7 @@ class DouBanEpisodeInfo(Base):
     id = sqlalchemy.Column(sqlalchemy.BigInteger, primary_key=True,autoincrement=True)
     sid = sqlalchemy.Column(
         sqlalchemy.VARCHAR(20), \
-        sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
+        # sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
         nullable=False, comment='豆瓣影视剧条目 ID'
     )
     episode = sqlalchemy.Column(TINYINT(3, unsigned=True), nullable=False, comment='多季剧集集数')
@@ -238,7 +238,7 @@ class DouBanEpisodeInfo(Base):
     )
 
     plot = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(600, collation='utf8mb4_general_ci', convert_unicode=True), 
+        sqlalchemy.VARCHAR(3000, collation='utf8mb4_general_ci', convert_unicode=True), 
         default=None, comment='豆瓣影视条目多季剧集剧情简介'
     )
     create_time = sqlalchemy.Column(
@@ -279,7 +279,7 @@ class DouBanSeriesWorker(Base):
 
     sid = sqlalchemy.Column(
         sqlalchemy.VARCHAR(20), \
-        sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
+        # sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
         nullable=False, comment='豆瓣影视剧条目 ID'
     )
     
@@ -293,14 +293,14 @@ class DouBanSeriesWorker(Base):
         default=None, comment='豆瓣影视演职人员姓名(非中文)'
     )
 
-    duty = sqlalchemy.Column(sqlalchemy.VARCHAR(10), comment='演职人员岗位')
+    duty = sqlalchemy.Column(sqlalchemy.VARCHAR(100), comment='演职人员岗位')
 
     action = sqlalchemy.Column(
         sqlalchemy.VARCHAR(5), default=None, comment='演员或其他配音演员，参与到影片中到方式'
     )
 
     role = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(15), default=None, comment='演员或其他配音演员，在影片中的角色'
+        sqlalchemy.VARCHAR(100), default=None, comment='演员或其他配音演员，在影片中的角色'
     )
 
     create_time = sqlalchemy.Column(
@@ -340,7 +340,7 @@ class DouBanSeriesPic(Base):
 
     sid = sqlalchemy.Column(
         sqlalchemy.VARCHAR(20), \
-        sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
+        # sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
         nullable=False, comment='豆瓣影视剧条目 ID'
     )
 
@@ -392,7 +392,8 @@ class DouBanSeriesPerson(Base):
     __table_args__ = {"mysql_engine": "InnoDB"}
 
     id = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(20), primary_key=True, comment='豆瓣影视演职人员的 ID'
+        sqlalchemy.VARCHAR(20), primary_key=True, comment='豆瓣影视演职人员的 ID',
+        autoincrement=True
     )
 
     name = sqlalchemy.Column(
@@ -471,3 +472,64 @@ class DouBanSeriesPerson(Base):
             for key in self.__dir__() if not key.startswith("_"))
         return format_ % items 
 
+
+class DouBanSeriesAwards(Base):
+    """影视获奖列表信息"""
+    __tablename__ = "awards"
+    __table_args__ = {"mysql_engine": "InnoDB"} 
+
+    id = sqlalchemy.Column(
+        sqlalchemy.BIGINT, primary_key=True, comment='豆瓣影视演职人员的 ID',
+        autoincrement=True
+    )
+
+
+    sid = sqlalchemy.Column(
+        sqlalchemy.VARCHAR(20), \
+        # sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
+        nullable=False, comment='豆瓣影视剧条目 ID'
+    )
+
+    host = sqlalchemy.Column(
+        sqlalchemy.VARCHAR(40, collation="utf8mb4_general_ci", convert_unicode=True),
+        nullable=False, comment='颁奖主办方'
+    )
+
+    year = sqlalchemy.Column(
+        YEAR(display_width=4), default=None, comment='获奖年份'
+    )
+
+    name = sqlalchemy.Column(
+        sqlalchemy.VARCHAR(30, collation="utf8mb4_general_ci", convert_unicode=True),
+        nullable=False, comment='获奖类型名称'
+    )
+
+    person = sqlalchemy.Column(
+        sqlalchemy.VARCHAR(60, collation="utf8mb4_general_ci", convert_unicode=True),
+        default=None, comment='获奖人姓名'
+    )
+
+    status = sqlalchemy.Column(
+        TINYINT(1), nullable=False, default=1, comment='最终获奖状态, 1 为获奖，0 表示只有提名'
+    )
+
+    create_time = sqlalchemy.Column(
+        sqlalchemy.DATETIME, server_default=func.now(), comment='首次爬取数据'
+    )
+    update_time = sqlalchemy.Column(
+        sqlalchemy.DATETIME, server_default=func.now(), onupdate=func.now(), \
+            comment='更新爬取时间，没有更新的情况和首次爬取时间一致'
+    ) 
+
+
+    def __repr__(self):
+        format = "<%s data model object at %s>"
+        return format % (self.__class__.__name__, hex(id(self)))
+
+    
+    def __str__(self):
+        format_ = "<{tbname} (%s)>".format(tbname=self.__tablename__)
+
+        items = ", ".join(f"{key}='{self.__getattribute__(key)}" \
+            for key in self.__dir__() if not key.startswith("_"))
+        return format_ % items  

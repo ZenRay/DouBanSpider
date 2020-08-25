@@ -21,7 +21,7 @@ class ListItem(scrapy.Item):
     cover_url = scrapy.Field(serializer=str) # 影视列表中各条目的海报 URL
 
 
-class DoubanDataItem(scrapy.Item):
+class DouBanDetailItem(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
     series_id = scrapy.Field() # 豆瓣影视 ID
@@ -47,6 +47,30 @@ class DoubanDataItem(scrapy.Item):
     official_site = scrapy.Field()  # 影视条目上的官方网站
     recommendation_type = scrapy.Field()
     recommendation_item = scrapy.Field()
+
+
+class DouBanAwardItem(scrapy.Item):
+    """获奖信息 Item"""
+    sid = scrapy.Field() # 豆瓣影视剧 ID
+    host = scrapy.Field()   # 颁奖主办方
+    year = scrapy.Field()   # 获奖年份
+    name = scrapy.Field()   # 获奖类型名称
+    person = scrapy.Field() # 获奖人姓名
+    status = scrapy.Field() # 最终获奖状态, 1 为获奖，0 表示只有提名
+    
+
+class DouBanWorkerItem(scrapy.Item):
+    """演职人员 Item
+    
+    是属于简介信息，并不是详细的 profile 信息
+    """
+    wid = scrapy.Field()    # 豆瓣影视演职人员 ID
+    name = scrapy.Field()    # 豆瓣影视演职人员姓名
+    alias = scrapy.Field()  # 豆瓣影视演职人员姓名(非中文)
+    sid = scrapy.Field()    # 豆瓣影视剧条目 ID
+    duty = scrapy.Field()   # 演职人员岗位
+    action = scrapy.Field() # 演员或其他配音演员，参与到影片中到方式
+    role = scrapy.Field()   # 演员或其他配音演员，在影片中的角色
 
 
 
