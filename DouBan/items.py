@@ -60,7 +60,7 @@ class DouBanAwardItem(scrapy.Item):
     
 
 class DouBanWorkerItem(scrapy.Item):
-    """演职人员 Item
+    """演职人员简介信息 Item
     
     是属于简介信息，并不是详细的 profile 信息
     """
@@ -72,6 +72,25 @@ class DouBanWorkerItem(scrapy.Item):
     action = scrapy.Field() # 演员或其他配音演员，参与到影片中到方式
     role = scrapy.Field()   # 演员或其他配音演员，在影片中的角色
 
+
+class DouBanPeopleItem(scrapy.Item):
+    """演职人员 profile 的 Item
+    """
+    id = scrapy.Field() # 豆瓣影视演职人员 ID
+    name = scrapy.Field()   # 豆瓣影视演职人员姓名
+    gender = scrapy.Field() # 豆瓣演职人员性别  
+    constellation = scrapy.Field()  # 星座
+    birthdate = scrapy.Field()  # 出生日期
+    birthplace = scrapy.Field() # 出生地
+    profession = scrapy.Field() # 职业
+    alias = scrapy.Field()  # 别名
+    alias_cn = scrapy.Field()   # 中文别名
+    family = scrapy.Field() # 家庭成员
+    imdb_link = scrapy.Field()  # IMDB 数据中 ID
+    official_web = scrapy.Field()   # 官方网站
+    introduction = scrapy.Field()   # 简介
+    imgs = scrapy.Field() # 演职人员图片链接
+    imgs_content = scrapy.Field() # 链接转换为已经请求的内容
 
 
 class CoverImageItem(scrapy.Item):

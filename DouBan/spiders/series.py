@@ -10,6 +10,8 @@ import re
 import redis
 import configparser
 import base64
+import string
+import numpy as np
 
 import numbers
 from os import path, remove
@@ -17,7 +19,8 @@ from pyquery import PyQuery
 from lxml import etree
 from urllib import parse
 from DouBan.items import (
-    CoverImageItem, DouBanDetailItem, ListItem, DouBanAwardItem, DouBanWorkerItem
+    CoverImageItem, DouBanDetailItem, ListItem, DouBanAwardItem, DouBanWorkerItem,
+    DouBanPeopleItem
 )
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
@@ -225,13 +228,24 @@ class SeriesSpider(scrapy.Spider):
 
     def parse_worker(self, response):
         """解析演职人员信息
+
+        解析演职人员基本信息之前，需要将各个演职人员的 profile 信息写入 people 表中，因此设计
+        爬取流程上需要在生成 item 数据之前完成爬取
         """
         item = DouBanWorkerItem()
         # 对演员的角色进行调整，使用 mapping 加快搜索
         duties = {duty.id:duty for duty in Workers.extract_duties(response)}
+        # profile 页面链接
+        url = "https://movie.douban.com/celebrity/{id}/"
 
         for worker in Workers.extract_basic(response):
-            item["wid"] = worker.id
+            if worker.id is None:
+                logger.debug(f"{worker.name} 没有ID信息，随机生成一个 15 位 ID")
+                id = "".join(np.random.choice(list(string.ascii_letters), 15))
+            else:
+                id = worker.id
+
+            item["wid"] = id
             item["name"] = worker.name
             item["alias"] = worker.alias
             item["sid"] = re.search("subject/(\d{3,})", response.url).group(1)
@@ -239,12 +253,82 @@ class SeriesSpider(scrapy.Spider):
             item["action"] = duties[worker.id].action if duties.get(worker.id) else None
             item["role"] = duties[worker.id].role if duties.get(worker.id) else None
 
+            # 请求 profile 页面信息
+            if worker.id is not None:
+                yield scrapy.Request(url.format(id=worker.id), callback=self.parse_people)
+            else:
+                people = DouBanPeopleItem({
+                    "id":id, "name": worker.name, "gender": 2
+                })
+                yield people
+            
+            # 传递获取到的 item 数据
             yield item
 
 
-    def parse(self, response):
-        pass
+    def parse_people(self, response):
+        """解析演职人员 Profile 页面
 
+        """
+        item = DouBanPeopleItem()
+        data = People.extract_bio_informaton(response)
+
+        item["id"] = data.id
+        item["name"] = data.name
+        # 调整性别值为整型数据
+        if data.gender is None:
+            gender = 2
+        elif "男" in data.gender:
+            gender = 1
+        else:
+            gender = 0
+
+        item["gender"] = gender
+        item["constellation"] = data.constellation
+        item["birthdate"] = data.birthdate
+        item["birthplace"] = data.birthplace
+        item["profession"] = data.profession
+        item["alias"] = data.alias
+        item["alias_cn"] = data.alias_cn
+        item["family"] = data.family
+        item["imdb_link"] = data.imdb_link
+        item["official_web"] = data.official_web
+        item["introduction"] = data.introduction
+
+        yield item
+
+        # 判断是否有上传图片，如果有图片那么需要请求图盘
+        if int(response.css("div#photos > div.hd span > a::text").re("全部(\d+)张")[0]) > 0:
+            yield scrapy.Request(url, callback=self.parse_person_imgs)
+
+
+    def parse_person_imgs(self, response):
+        """解析演职人员的图片
+
+        仅保留首页中的图片
+        """
+        item = DouBanPeopleItem()
+        id = re.search("/celebrity/(\d+)/", response.url).group(1)
+        imgs = response.css(
+            "div.article > ul.clearfix > li > div.cover img::attr(src)"
+        ).extract()
+
+        if self.config.getboolean("optional", "crawl_people_img"):
+            contents = []
+            for link in imgs:
+                res = requests.get(link)
+                if int(res.status_code) == 200:
+                    contents.append(base64.b64encode(res.content))
+                else:
+                    contents.append(None)
+        else:
+            contents = None
+
+        item["imgs"] = imgs
+        item["id"] = id
+        item["imgs_content"] = contents
+
+        yield item
 
 
 
@@ -290,9 +374,3 @@ class SeriesSpider(scrapy.Spider):
         # celebrity_id: 姓名对应的 ID，需要从链接中解析仅保存其中的 ID
         # duty: 职能，例如: 导演、演员、配音 等
         # role: 角色，某些职能不参与影视内角色，可以是空
-# ! 提名以及获奖信息，通过详情页的 id 拼接，: https://movie.douban.com/subject/{影视 ID}/awards/
-    # id: 影视 ID
-        # time: 获奖或提名时间
-        # host: 主办方以及时期，eg: 第65届黄金时段艾美奖
-        # name: 获奖获提名信息
-        # receiver: 获奖人姓名以及 id(仅存储 celebrity 之后的 id), 以 dict 存储{'name':<name>, 'id':<id>}

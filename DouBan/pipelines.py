@@ -15,7 +15,8 @@ from scrapy.exceptions import DropItem
 from DouBan.utils.base import BaseSQLPipeline, BasePipeline
 from DouBan.utils.hammers import extract1st_char
 from DouBan.items import (
-    DouBanDetailItem, DouBanAwardItem, CoverImageItem, ListItem, DouBanWorkerItem
+    DouBanDetailItem, DouBanAwardItem, CoverImageItem, ListItem, DouBanWorkerItem,
+    DouBanPeopleItem
 )
 from DouBan.database.manager.datamodel import *
 from DouBan.database.manager import DataBaseManipulater
@@ -399,7 +400,7 @@ class DouBanAwardPipeline(BasePipeline):
             data = DouBanSeriesAwards(**item)
             session.merge(data)
             session.commit()
-        raise DropItem(f"获奖信息写入完成{item['sid']}")
+        raise DropItem(f"获奖信息写入 awards 完成: {item['sid']}")
 
 
 
@@ -414,4 +415,26 @@ class DouBanWorkerPipeline(BasePipeline):
             data = DouBanSeriesWorker(**item)
             session.merge(data)
             session.commit()
-        raise DropItem(f"演职人员信息写入完成{item['sid']}")
+        raise DropItem(f"演职人员信息写入 worker 完成: {item['sid']}")
+
+
+
+class DouBanPeoplePipeline(BasePipeline):
+    def process_item(self, item, spider):
+        """处理豆瓣影视演职人员 Profile数据
+        
+        """
+        if not isinstance(item, DouBanPeopleItem):
+            return item
+
+        # 如果 DouBanPeopleItem 中没有 name 数据后，那么说明需要不需要传入到 MySQL 数据库
+        if item.get("name", False)
+            with manipulater.get_session() as session:
+                data = DouBanSeriesPerson(**item)
+                session.merge(data)
+                session.commit()
+        else:
+            # TODO: 需要将数据写入到 MongoDB 中，尚未完成
+            pass
+        
+        raise DropItem(f"演职人员 Profile 信息写入 people 完成: {item['id']}")

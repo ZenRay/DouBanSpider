@@ -531,4 +531,4 @@ class DouBanSeriesAwards(Base):
 
         items = ", ".join(f"{key}='{self.__getattribute__(key)}" \
             for key in self.__dir__() if not key.startswith("_"))
-        return format_ % items  
+        return format_ % items
