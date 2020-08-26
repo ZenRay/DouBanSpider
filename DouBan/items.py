@@ -6,6 +6,7 @@
 # https://docs.scrapy.org/en/latest/topics/items.html
 
 import scrapy
+import json
 
 
 
@@ -91,6 +92,32 @@ class DouBanPeopleItem(scrapy.Item):
     introduction = scrapy.Field()   # 简介
     imgs = scrapy.Field() # 演职人员图片链接
     imgs_content = scrapy.Field() # 链接转换为已经请求的内容
+
+
+class DouBanPhotosItem(scrapy.Item):
+    """豆瓣影视图片
+    
+    """
+    pid = scrapy.Field()    # 图片链接，保存的数据形式为 array
+    sid = scrapy.Field()    # 影视 ID
+    url = scrapy.Field()    # 原始图片链接
+    content = scrapy.Field()    # 图片的请求到的二进制内容
+    description = scrapy.Field() # 图片描述性信息
+    specification = scrapy.Field()  # 图片规格
+    type = scrapy.Field()   # 当前页面爬取的类型，包括了剧照、海报和壁纸
+
+
+    
+class DouBanEpisodeItem(scrapy.Item):
+    """豆瓣电视剧分集信息
+    """
+    sid = scrapy.Field()    # 影视 ID
+    episode = scrapy.Field()    # 剧集集数
+    title = scrapy.Field()  # 剧集标题
+    origin_title = scrapy.Field()   # 原始标题，可能是非中文标题
+    date = scrapy.Field()   # 播放日期
+    plot = scrapy.Field()   # 剧情简介
+
 
 
 class CoverImageItem(scrapy.Item):
