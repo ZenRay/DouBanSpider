@@ -20,7 +20,7 @@ from lxml import etree
 from urllib import parse
 from DouBan.items import (
     CoverImageItem, DouBanDetailItem, ListItem, DouBanAwardItem, DouBanWorkerItem,
-    DouBanPeopleItem
+    DouBanPeopleItem, DouBanPhotosItem
 )
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
@@ -199,7 +199,7 @@ class SeriesSpider(scrapy.Spider):
         else:
             item["recommendation_item"] = None
         yield item
-        # import ipdb; ipdb.set_trace()
+        
         # 请求获奖详细列表信息
         if response.css("div.mod").re("获奖情况"):
             url = f"https://movie.douban.com/subject/{item['series_id']}/awards/"
@@ -209,6 +209,23 @@ class SeriesSpider(scrapy.Spider):
         if response.css("div.celebrities").re("演职员"):
             url = f"https://movie.douban.com/subject/{item['series_id']}/celebrities"
             yield scrapy.Request(url, callback=self.parse_worker)
+
+        # 请求海报和壁纸信息
+        url = f"https://movie.douban.com/subject/{item['series_id']}/photos?type="
+        types = ["S", "R", "W"]
+        
+        for type_ in types:
+            yield scrapy.Request(url+type_, callback=self.parse_photos, meta={"max_depth":0})
+
+        # 判断页面内容是否有分集(说明是电视剧)
+        if response.css("div.article h2 i").re("分集短评"):
+            for episode_link in response.css(
+                    "div.article > div.episode_list > a::attr(href)"
+                ).extract():
+                url = f"https://movie.douban.com/{episode_link}"
+                yield scrapy.Request(url, callback=self.parse_episode)
+
+
 
 
     def parse_awards(self, response):
@@ -297,8 +314,9 @@ class SeriesSpider(scrapy.Spider):
 
         yield item
 
-        # 判断是否有上传图片，如果有图片那么需要请求图盘
+        # 判断是否有上传图片，如果有图片那么需要请求图片
         if int(response.css("div#photos > div.hd span > a::text").re("全部(\d+)张")[0]) > 0:
+            url = response.url + "photos/"
             yield scrapy.Request(url, callback=self.parse_person_imgs)
 
 
@@ -331,6 +349,55 @@ class SeriesSpider(scrapy.Spider):
         yield item
 
 
+    def parse_photos(self, response):
+        """解析所有相关的图片
+
+        """
+        item = DouBanPhotosItem()
+        item["sid"] = re.search("subject/(\d{3,})", response.url).group(1)
+        type_ = parse.parse_qs(parse.splitquery(response.url)[1])["type"][0]
+        
+        # 转换图片类型：海报、剧照还是壁纸
+        if type_ == "R":
+            item["type"] = "海报"
+            datum, next_ = Pictures.extract_poster(response)
+        elif type_ == "S":
+            item["type"] = "剧照"
+            datum, next_ = Pictures.extract_wallpaper_and_series_still(response)
+        elif type_ == "W":
+            item["type"] = "壁纸"
+            datum, next_ = Pictures.extract_wallpaper_and_series_still(response)
+        
+        
+        # 遍历获取到数据，转换为 Item
+        for data in datum:
+            item["pid"] = data.id
+            item["url"] = data.url
+            item['specification'] = data.specification
+            item["content"] = self.request_img_content(data.url)
+            item["description"] = data.description
+
+            yield item
+        
+        # 需要判断是否需要请求下一页，并且请求的深度小于最大深度限制
+        # import ipdb; ipdb.set_trace()
+        if bool(next_) & (response.meta.get("max_depth") < self.config.getint("optional", "crawl_imgs_max_depth")):
+            yield scrapy.Request(next_, callback=self.parse_photos, \
+                meta={"max_depth": response.meta["max_depth"] + 1})
+
+
+    def request_img_content(self, url):
+        """请求图片的内容
+
+        需要根据全局设置判断是否需要获取图片的二进制内容
+        """
+        result = None
+        if self.config.getboolean("optional", "crawl_people_img"):
+            res = requests.get(url)
+            if int(res.status_code) == 200:
+                result = base64.b64encode(res.content)
+        
+        return result
 
 
 #* 需要再次请求的信息
@@ -363,14 +430,3 @@ class SeriesSpider(scrapy.Spider):
         # title_origin: 当前集的原始标题，主要指原始语言标题
         # play_date: 播放日期
         # introduction: 内容简介
-# ! 海报，通过详情页的 id 拼接，此外页面上有显性的下一页: 
-# !   https://movie.douban.com/subject/{影视 id}/photos?type=R  以及 https://movie.douban.com/subject/{影视 id}/photos?type=W
-    # id: 影视 ID
-        # url: 图片链接，需要在页面内搜索 li[@data-id]拼接 https://img1.doubanio.com/view/photo/l/public/p{data-id}.webp
-        # type: 图片来源，海报或者壁纸
-# ! 演职人员信息，通过详情页的 id 拼接，相关角色通过页面解析: https://movie.douban.com/subject/{影视 ID}/celebrities
-    # id: 影视 ID
-        # name: 姓名
-        # celebrity_id: 姓名对应的 ID，需要从链接中解析仅保存其中的 ID
-        # duty: 职能，例如: 导演、演员、配音 等
-        # role: 角色，某些职能不参与影视内角色，可以是空
