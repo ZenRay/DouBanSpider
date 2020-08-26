@@ -20,7 +20,7 @@ from lxml import etree
 from urllib import parse
 from DouBan.items import (
     CoverImageItem, DouBanDetailItem, ListItem, DouBanAwardItem, DouBanWorkerItem,
-    DouBanPeopleItem, DouBanPhotosItem
+    DouBanPeopleItem, DouBanPhotosItem, DouBanEpisodeItem
 )
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
@@ -76,7 +76,7 @@ class SeriesSpider(scrapy.Spider):
                 yield scrapy.Request(url, callback=self.direct_parse_page)
         
 
-        # TODO: 需要完成对存储在表中的电视剧内容进行爬去和解析——用于解析详情内容
+        # TODO: 需要完成对存储在表中的影视内容进行爬去和解析——用于解析详情内容
         if global_config.getboolean("addictive_series", "check_table"):
             # 数据管理对象
             from DouBan.database.manager import DataBaseManipulater
@@ -85,7 +85,8 @@ class SeriesSpider(scrapy.Spider):
             url = "https://movie.douban.com/subject/{seed}/"
             # 从种子数据库中提取未爬取的数据
             with manipulater.get_session() as session:
-                seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0)
+                # import ipdb; ipdb.set_trace()
+                seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0).order_by(DouBanSeriesSeed.create_time.desc())
                 # ! debugger
                 # import numpy as np
                 for seed in seeds.all():
@@ -384,6 +385,18 @@ class SeriesSpider(scrapy.Spider):
         if bool(next_) & (response.meta.get("max_depth") < self.config.getint("optional", "crawl_imgs_max_depth")):
             yield scrapy.Request(next_, callback=self.parse_photos, \
                 meta={"max_depth": response.meta["max_depth"] + 1})
+
+
+    def parse_episode(self, response):
+        """解析分集信息
+        """
+        data = Details.extract_episode_info(response)
+        item = DouBanEpisodeItem()
+        for field in ["sid", "episode", "title", "origin_title", "date", "plot"]:
+            item[field] = getattr(data, field)
+        
+        yield item
+
 
 
     def request_img_content(self, url):
