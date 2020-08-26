@@ -233,8 +233,8 @@ class DouBanEpisodeInfo(Base):
         comment='影视剧集原始标题，主要是一类国外剧集的标题', default=None
     )
     date = sqlalchemy.Column(
-        sqlalchemy.DateTime, default=None, server_default=func.now(), 
-        comment="剧集上映日期"
+        sqlalchemy.VARCHAR(200, convert_unicode=True, collation="utf8mb4_general_ci"), 
+        default=None, comment="剧集上映日期"
     )
 
     plot = sqlalchemy.Column(
@@ -352,7 +352,7 @@ class DouBanSeriesPic(Base):
         sqlalchemy.BLOB, nullable=True, comment="豆瓣影视海报和壁纸的链接请求后的 content，避免后续无法请求的情况"
     )
 
-    descripton = sqlalchemy.Column(
+    description = sqlalchemy.Column(
         sqlalchemy.VARCHAR(40, convert_unicode=True, collation="utf8mb4_general_ci"), \
             default=None, comment='豆瓣影视海报和壁纸的描述信息'
     )
@@ -361,6 +361,9 @@ class DouBanSeriesPic(Base):
         sqlalchemy.VARCHAR(30), default=None, comment="影视海报和壁纸原始规格描述"
     )
 
+    type = sqlalchemy.Column(
+        sqlalchemy.VARCHAR(10), default=None, comment="影视图片类型：海报、壁纸或者剧照"
+    )
     create_time = sqlalchemy.Column(
         sqlalchemy.DATETIME, server_default=func.now(), comment='首次爬取数据'
     )
@@ -438,7 +441,7 @@ class DouBanSeriesPerson(Base):
     )
 
     imdb_link = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(30), default=None, comment='IMDB 数据中的链接'
+        sqlalchemy.VARCHAR(30), default=None, comment='IMDB 数据中 ID'
     )
 
     official_web = sqlalchemy.Column(
