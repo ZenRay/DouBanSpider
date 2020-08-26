@@ -414,7 +414,12 @@ class DouBanWorkerPipeline(BasePipeline):
             return item
 
         with manipulater.get_session() as session:
-            data = DouBanSeriesWorker(**item)
+            query = session.query(DouBanSeriesWorker).filter_by(sid=item["sid"]).first()
+
+            if query:
+                data = DouBanSeriesWorker(**item, id=query.id) 
+            else:
+                data = DouBanSeriesWorker(**item) 
             session.merge(data)
             session.commit()
             self.logger.debug(f"演职人员信息写入 worker 完成: {item['sid']}")
@@ -470,7 +475,12 @@ class DouBanEpisodePipeline(BasePipeline):
             return item
 
         with manipulater.get_session() as session:
-            data = DouBanEpisodeInfo(**item)
+            query = session.query(DouBanEpisodeInfo).filter_by(sid=item["sid"], episode=item["episode"]).first()
+
+            if query:
+                data = DouBanEpisodeInfo(**item, id=query.id) 
+            else:
+                data = DouBanEpisodeInfo(**item) 
             session.merge(data)
             session.commit()
             self.logger.info(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
