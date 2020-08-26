@@ -41,15 +41,15 @@ class Details:
     __content_name: 当前内容的名称，name 为页面中条目标题名称，alias 为根据可选名称得到了
             别名
     __people: 演职人员信息，id 演职人员 ID，name 演职人员姓名
-    __episode: 剧集简介信息，id 剧集 ID，episode 当前集数，title 当前剧集标题，origin 当
-        前剧集原始标题，date 当前剧集播放日期，plot 当前剧集剧情简介
+    __episode: 剧集简介信息，sid 剧集 ID，episode 当前集数，title 当前剧集标题，
+        origin_title 当前剧集原始标题，date 当前剧集播放日期，plot 当前剧集剧情简介
     """
     __recommendation_item = namedtuple("recommendation_item", \
         ["id", "name"])
 
     __content_name = namedtuple("item_name", ["name", "alias"])
     __people = namedtuple("worker", ["id", "name"])
-    __episode = namedtuple("episode", ["id", "episode", "title", "origin", \
+    __episode = namedtuple("episode", ["sid", "episode", "title", "origin_title", \
         "date", "plot"])
 
     def __init__(self):
@@ -478,7 +478,7 @@ class Details:
         提取剧集各集的介绍，包括影视的 ID，影视集数，影视当前集数标题，当前影视原始标题以及播
         放日期、剧情简介
         """
-        id = re.search("subject\/(\d{2,})\/episode", response.url).group(1)
+        sid = re.search("subject\/(\d{2,})\/episode", response.url).group(1)
         episode = re.search("episode\/(\d{1,3})", response.url).group(1)
         # 判断是否有中文名
         if cls.check_attribute(response, name="本集中文名:", query= \
@@ -492,11 +492,11 @@ class Details:
             title = None
         
         # 判断是否有原始名称 
-        origin = response.css(
+        origin_title = response.css(
                     "div.article > ul.ep-info > li:nth-of-type(2) > span.all::text"
                 ).extract_first()
-        if origin:
-            origin = origin.strip()
+        if origin_title:
+            origin_title = origin_title.strip()
         
         # 播放时间
         element = response.xpath(
@@ -528,8 +528,8 @@ class Details:
                 plot += more.strip()
         
 
-        result = cls.__episode(id=id, episode=episode, title=title, \
-            origin=origin, date=date, plot=plot)
+        result = cls.__episode(sid=sid, episode=episode, title=title, \
+            origin_title=origin_title, date=date, plot=plot)
 
         return result
 
@@ -644,12 +644,13 @@ class Pictures:
 
     Properties:
     -------------
-    __poster: 海报信息, id 为海报的 ID，url 为海报的链接，description 为海报的描述信息，
+    __pics: 海报信息, id 为海报的 ID，url 为海报的链接，description 为海报的描述信息，
         可能包括一些使用区域等描述，specification 为海报的规格信息
-    __wallpaper: 壁纸信息，id 为壁纸的 ID，url 为壁纸的链接，specification 为壁纸规格信息
     """
-    __poster = namedtuple("poster", ["id", "url", "description", "specification"])
-    __wallpaper = namedtuple("wallpaper", ["id", "url", "specification"])
+    __pics = namedtuple("pictures", [
+        "id", "url", "specification", "description"
+    ], defaults=[None])
+    
     @classmethod
     def extract_poster(cls, response):
         """
@@ -668,13 +669,13 @@ class Pictures:
         elements = response.css("div#wrapper > div#content div.article > ul > li")
 
         if elements:
-            result = {}
+            result = []
             for element in elements:
                 id = element.css("::attr(data-id)").extract_first().strip()
                 url = element.css("div.cover img::attr(src)").extract_first().strip()
                 description = element.css("div.name::text").extract_first().strip()
                 specification = element.css("div.prop::text").extract_first().strip()
-                result[id] = cls.__poster(id, url, description, specification)
+                result.append(cls.__pics(id, url, specification, description))
 
             # 如果有下一页需要和结果一起传出
             has_next = response.css(
@@ -686,10 +687,12 @@ class Pictures:
                 next_ = False
             
             return result, next_
+        else:
+            return [], False
 
 
     @classmethod
-    def extract_wallpaper(cls, response):
+    def extract_wallpaper_and_series_still(cls, response):
         """
         提取壁纸链接
 
@@ -705,13 +708,13 @@ class Pictures:
         elements = response.css("div#wrapper > div#content div.article > ul > li")
 
         if elements:
-            result = {}
+            result = []
             for element in elements:
                 id = element.css("::attr(data-id)").extract_first().strip()
                 url = element.css("div.cover img::attr(src)").extract_first().strip()
                 
                 specification = element.css("div.prop::text").extract_first().strip()
-                result[id] = cls.__wallpaper(id, url, specification)
+                result.append(cls.__pics(id, url, specification))
 
             # 如果有下一页需要和结果一起传出
             has_next = response.css(
@@ -723,6 +726,8 @@ class Pictures:
                 next_ = False
             
             return result, next_ 
+        else:
+            return [], False
 
 
 class Comments:
