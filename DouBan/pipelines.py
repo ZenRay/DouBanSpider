@@ -16,7 +16,7 @@ from DouBan.utils.base import BaseSQLPipeline, BasePipeline
 from DouBan.utils.hammers import extract1st_char
 from DouBan.items import (
     DouBanDetailItem, DouBanAwardItem, CoverImageItem, ListItem, DouBanWorkerItem,
-    DouBanPeopleItem
+    DouBanPeopleItem, DouBanPhotosItem, DouBanEpisodeItem
 )
 from DouBan.database.manager.datamodel import *
 from DouBan.database.manager import DataBaseManipulater
@@ -385,7 +385,8 @@ class DouBanDetailPipeline(BasePipeline):
             data = DouBanSeriesInfo(**item)
             session.merge(data)
             session.commit()
-        raise DropItem(f"影视条目写入完成 {item['series_id']}: {item['name']}")
+            self.logger.debug(f"影视条目写入完成 {item['series_id']}: {item['name']}")
+        # raise DropItem(f"影视条目写入完成 {item['series_id']}: {item['name']}")
 
 
 
@@ -400,7 +401,8 @@ class DouBanAwardPipeline(BasePipeline):
             data = DouBanSeriesAwards(**item)
             session.merge(data)
             session.commit()
-        raise DropItem(f"获奖信息写入 awards 完成: {item['sid']}")
+            self.logger.info(f"获奖信息写入 awards 完成: {item['sid']}")
+        # raise DropItem(f"获奖信息写入 awards 完成: {item['sid']}")
 
 
 
@@ -415,7 +417,8 @@ class DouBanWorkerPipeline(BasePipeline):
             data = DouBanSeriesWorker(**item)
             session.merge(data)
             session.commit()
-        raise DropItem(f"演职人员信息写入 worker 完成: {item['sid']}")
+            self.logger.debug(f"演职人员信息写入 worker 完成: {item['sid']}")
+        # raise DropItem(f"演职人员信息写入 worker 完成: {item['sid']}")
 
 
 
@@ -428,13 +431,48 @@ class DouBanPeoplePipeline(BasePipeline):
             return item
 
         # 如果 DouBanPeopleItem 中没有 name 数据后，那么说明需要不需要传入到 MySQL 数据库
-        if item.get("name", False)
+        # 该条数据是表示的是关于演职人员的 图片信息，数据是 array——解析的 item 来源是 
+        # parse_person_imgs
+        if item.get("name", False):
             with manipulater.get_session() as session:
                 data = DouBanSeriesPerson(**item)
                 session.merge(data)
                 session.commit()
+                self.logger.debug(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
+                # raise DropItem(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
         else:
             # TODO: 需要将数据写入到 MongoDB 中，尚未完成
             pass
         
-        raise DropItem(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
+        
+
+class DouBanPicturePipeline(BasePipeline):
+    def process_item(self, item, spider):
+        """处理豆瓣影视海报、剧照以及壁纸
+        
+        """
+        if not isinstance(item, DouBanPhotosItem):
+            return item
+
+        with manipulater.get_session() as session:
+            data = DouBanSeriesPic(**item)
+            session.merge(data)
+            session.commit()
+            self.logger.debug(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
+        raise DropItem(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
+
+
+class DouBanEpisodePipeline(BasePipeline):
+    def process_item(self, item, spider):
+        """处理豆瓣影视剧集信息
+        """
+        if not isinstance(item, DouBanEpisodeItem):
+            return item
+
+        with manipulater.get_session() as session:
+            data = DouBanEpisodeInfo(**item)
+            session.merge(data)
+            session.commit()
+            self.logger.info(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
+
+        raise DropItem(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
