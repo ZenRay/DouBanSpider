@@ -177,7 +177,7 @@ CREATE TABLE `person` (
   `name` varchar(25) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '豆瓣影视演职人员姓名',
   `gender` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '演职人员性别, 1 为男性，0 为女性, 2 为未标注，默认为 2'
   `constellation` varchar(5) DEFAULT NULL COMMENT '影视演职人员星座',
-  `birthdate` date COMMENT '影视演职人员出生日期',
+  `birthdate` varchar(30) COMMENT '影视演职人员出生日期',
   `birthplace` varchar(30) DEFAULT NULL COMMENT '影视演职人员出生地',
   `profession` varchar(40) DEFAULT NULL COMMENT '演职人员的职业名称，可能使用 / 分隔',
   `alias` varchar(160) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视演职人员姓名(非中文)',  

@@ -412,7 +412,7 @@ class DouBanSeriesPerson(Base):
     )
     
     birthdate = sqlalchemy.Column(
-        sqlalchemy.DATE, default=None, comment='影视演职人员出生日期'
+        sqlalchemy.VARCHAR(30), default=None, comment='影视演职人员出生日期'
     )
 
     birthplace = sqlalchemy.Column(
