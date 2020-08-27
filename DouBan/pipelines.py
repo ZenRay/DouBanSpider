@@ -377,15 +377,16 @@ class DouBanDetailPipeline(BasePipeline):
             # 根据全局配置参数 update_table 确认是否需要更新
             if spider.config.getboolean("addictive_series", "update_table"):
                 temp = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.series_id==item["series_id"]).first()
-                temp.crawled = True
-                session.merge(temp)
-                session.commit()
-                self.log(f"Update Seed Status: {temp.series_id}")
+                if temp:
+                    temp.crawled = True
+                    session.merge(temp)
+                    session.commit()
+                    self.log(f"Update Seed Status: {temp.series_id}")
             
             data = DouBanSeriesInfo(**item)
             session.merge(data)
             session.commit()
-            self.logger.debug(f"影视条目写入完成 {item['series_id']}: {item['name']}")
+            self.logger.info(f"影视条目写入完成 {item['series_id']}: {item['name']}")
         # raise DropItem(f"影视条目写入完成 {item['series_id']}: {item['name']}")
 
 
@@ -414,15 +415,15 @@ class DouBanWorkerPipeline(BasePipeline):
             return item
 
         with manipulater.get_session() as session:
+            data = DouBanSeriesWorker(**item)
             query = session.query(DouBanSeriesWorker).filter_by(sid=item["sid"]).first()
 
             if query:
-                data = DouBanSeriesWorker(**item, id=query.id) 
-            else:
-                data = DouBanSeriesWorker(**item) 
+                data.wid = query.wid
+                
             session.merge(data)
             session.commit()
-            self.logger.debug(f"演职人员信息写入 worker 完成: {item['sid']}")
+            self.logger.info(f"演职人员信息写入 worker 完成: {item['sid']}")
         # raise DropItem(f"演职人员信息写入 worker 完成: {item['sid']}")
 
 
@@ -443,7 +444,7 @@ class DouBanPeoplePipeline(BasePipeline):
                 data = DouBanSeriesPerson(**item)
                 session.merge(data)
                 session.commit()
-                self.logger.debug(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
+                self.logger.info(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
                 # raise DropItem(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
         else:
             # TODO: 需要将数据写入到 MongoDB 中，尚未完成
@@ -463,8 +464,8 @@ class DouBanPicturePipeline(BasePipeline):
             data = DouBanSeriesPic(**item)
             session.merge(data)
             session.commit()
-            self.logger.debug(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
-        raise DropItem(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
+            self.logger.info(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
+        # raise DropItem(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
 
 
 class DouBanEpisodePipeline(BasePipeline):
@@ -475,14 +476,15 @@ class DouBanEpisodePipeline(BasePipeline):
             return item
 
         with manipulater.get_session() as session:
+            data = DouBanEpisodeInfo(**item) 
             query = session.query(DouBanEpisodeInfo).filter_by(sid=item["sid"], episode=item["episode"]).first()
 
             if query:
-                data = DouBanEpisodeInfo(**item, id=query.id) 
-            else:
-                data = DouBanEpisodeInfo(**item) 
+                data.id = query.id
+            
+                
             session.merge(data)
             session.commit()
             self.logger.info(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
 
-        raise DropItem(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
+        # raise DropItem(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
