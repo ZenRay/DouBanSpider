@@ -2,6 +2,7 @@
 import scrapy
 
 import requests
+import requests_html
 import json
 import ssl
 import logging
@@ -20,7 +21,7 @@ from lxml import etree
 from urllib import parse
 from DouBan.items import (
     CoverImageItem, DouBanDetailItem, ListItem, DouBanAwardItem, DouBanWorkerItem,
-    DouBanPeopleItem, DouBanPhotosItem, DouBanEpisodeItem
+    DouBanPeopleItem, DouBanPhotosItem, DouBanEpisodeItem, DouBanCommentsItemM
 )
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
@@ -86,11 +87,15 @@ class SeriesSpider(scrapy.Spider):
             # 从种子数据库中提取未爬取的数据
             with manipulater.get_session() as session:
                 # import ipdb; ipdb.set_trace()
-                seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0).order_by(DouBanSeriesSeed.create_time.desc())
+                # seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0).order_by(DouBanSeriesSeed.create_time.desc())
                 # ! debugger
                 # import numpy as np
-                for seed in seeds.all():
-                    yield scrapy.Request(url.format(seed=seed.series_id), \
+                # for seed in seeds.all():
+                #     yield scrapy.Request(url.format(seed=seed.series_id), \
+                #         callback=self.detail_page, meta={"session": session})
+
+                for seed in ["1292052"]: #seeds.all():
+                    yield scrapy.Request(url.format(seed=seed), \
                         callback=self.detail_page, meta={"session": session})
                     
                     # ! Debugger
@@ -185,7 +190,7 @@ class SeriesSpider(scrapy.Spider):
             if int(res.status_code) == 200:
                 item["cover_content"] = base64.b64encode(res.content)
             else:
-                logger.debug(f"Request Image content failed:{item.cover}")
+                logger.error(f"Request Image content failed:{item.cover}")
                 item["cover_content"] = None
 
         item["official_site"] = Details.extract_official_web(response)
@@ -226,7 +231,15 @@ class SeriesSpider(scrapy.Spider):
                 url = f"https://movie.douban.com/{episode_link}"
                 yield scrapy.Request(url, callback=self.parse_episode)
 
-
+        # 评论内容
+        url = f"https://movie.douban.com/subject/{item['series_id']}/"
+        for query in ["comments?status=P", "comments?status=F", "reviews"]:
+            # 影评需要修改 headers
+            if query.startswith("reviews"):
+                continue
+                yield scrapy.Request(url+query, callback=self.parse_comments)
+            else:
+                yield scrapy.Request(url+query, callback=self.parse_comments)
 
 
     def parse_awards(self, response):
@@ -381,7 +394,6 @@ class SeriesSpider(scrapy.Spider):
             yield item
         
         # 需要判断是否需要请求下一页，并且请求的深度小于最大深度限制
-        # import ipdb; ipdb.set_trace()
         if bool(next_) & (response.meta.get("max_depth") < self.config.getint("optional", "crawl_imgs_max_depth")):
             yield scrapy.Request(next_, callback=self.parse_photos, \
                 meta={"max_depth": response.meta["max_depth"] + 1})
@@ -396,6 +408,31 @@ class SeriesSpider(scrapy.Spider):
             item[field] = getattr(data, field)
         
         yield item
+
+
+    def parse_comments(self, response):
+        # import ipdb; ipdb.set_trace()
+        # from scrapy.shell import inspect_response
+        # inspect_response(response, self)
+        
+        if "comments" in response.url:
+            datum, next_ = Comments.extract_short_comment(response)
+        else:
+            with requests_html.HTMLSession() as session:
+                res = session.get(response.url)
+                datum, next_ = Comments.extract_reviews(res, True)
+        
+        sid = re.search("subject/(\d+)/", response.url).group(1)
+        
+        for data in datum:
+            item = DouBanCommentsItemM(**{field: data._asdict().get(field) if field != "sid" else sid \
+                for field in DouBanCommentsItemM.fields})
+            # import ipdb; ipdb.set_trace()
+            yield item
+        
+        # 下一页
+        if next_:
+            yield scrapy.Request(next_, callback=self.parse_comments)
 
 
 
