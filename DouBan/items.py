@@ -120,6 +120,45 @@ class DouBanEpisodeItem(scrapy.Item):
 
 
 
+class DouBanCommentsItemM(scrapy.Item):
+    """豆瓣用户影视评论内容
+
+    包括短评论：想看和已看的短评论内容
+    影评：对影视内容的长评论
+    综合短评论和影评的字段信息如下:
+        * sid 影视 ID
+        * name 用户名
+        * uid 用户链接
+        * upic 用户头像
+        * date 用户评论日期
+        * comment_id 用户评论内容的 ID
+        * title 影评的标题，短评是没有标题的
+        * content 用户评论的内容
+        * content_url 影评的 URL，可以获取影评全文
+        * rate 评分
+        * thumb 赞同评论的用户数量
+        * down 不赞同该评论的数量
+        * reply 回复该评论的数量
+        * watched 短评用户是否已经观看过影视内容，False 表示想看，True 表示看过
+    """
+    sid = scrapy.Field()    
+    name = scrapy.Field() 
+    uid = scrapy.Field() 
+    upic = scrapy.Field()   
+    date = scrapy.Field()   
+    comment_id = scrapy.Field() 
+    title = scrapy.Field()  
+    content = scrapy.Field()    
+    content_url = scrapy.Field() 
+    rate = scrapy.Field()   
+    thumb = scrapy.Field()  
+    down = scrapy.Field()   
+    reply = scrapy.Field()   
+    watched = scrapy.Field()    
+
+
+
+
 class CoverImageItem(scrapy.Item):
     id = scrapy.Field(serializer=str)
     name = scrapy.Field(serializer=str)
