@@ -143,11 +143,11 @@ CREATE TABLE `picture` (
 
 
 -- ----------------------------
--- Table structure for awards
+-- Table structure for award
 -- 存储影视获奖信息
 -- ----------------------------
-DROP TABLE IF EXISTS `awards`;
-CREATE TABLE `awards` (
+DROP TABLE IF EXISTS `award`;
+CREATE TABLE `award` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `sid` varchar(20) NOT NULL COMMENT '豆瓣影视剧 ID'
   `host` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '颁奖主办方',
