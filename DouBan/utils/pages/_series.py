@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import re
 import json
 import datetime
+import requests_html
 
 from collections import namedtuple
 from DouBan.utils.exceptions import LostArgument, ValueConsistenceError
@@ -743,18 +744,19 @@ class Comments:
     Properties:
     -------------
     __short: 影片短评，name 用户姓名，uid 用户链接，upic 用户头像，date 用户评论日期
-        cid 用户评论 ID，content 用户评论的内容，thumb 赞同该评论用户，watched 用户是否已
+        comment_id 用户评论 ID，content 用户评论的内容，thumb 赞同该评论用户，watched 用户是否已
         经观看-因为影片的评论包括了想看和已看两种类型
     __review: 影片评论，针对影片发表长评论。name 用户姓名，uid 用户链接，upic 用户头像，
-        date 用户评论日期，cid 用户评论 ID，short_content 用户评论的部分内容（完整内容需要
-        请求其他页面），title 评论标题，contetn_url 可以获取到详细评论的 URL，thumb 赞同
+        date 用户评论日期，comment_id 用户评论 ID，content 用户评论的部分内容（完整内容需要
+        请求其他页面），title 评论标题，content_url 可以获取到详细评论的 URL，thumb 赞同
         该评论的数量，down 不赞同该评论的数量，reply 回复该评论的数量
     """
     __short = namedtuple("short_comment", \
-        ["name", "uid", "upic", "date", "cid", "rate", "content", "thumb", "watched"])
+        ["name", "uid", "upic", "date", "comment_id", "rate", "content", "thumb", \
+            "watched"])
 
     __review = namedtuple("review", \
-        ["name", "uid", "upic", "date", "cid", "rate", "short_content", "title", \
+        ["name", "uid", "upic", "date", "comment_id", "rate", "content", "title", \
             "content_url", "thumb", "down", "reply"])
     @classmethod
     def extract_short_comment(cls, response):
@@ -767,7 +769,7 @@ class Comments:
 
         Results:
         ------------
-        result: dict, key 是评论的 id，nametuple 保存 value，包括了 name, uid, upic,
+        result: dict, nametuple 保存 value，包括了 name, uid, upic,
             date, cid, rate, content, thumb
         next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
         """
@@ -775,8 +777,9 @@ class Comments:
             "div#wrapper > div#content  div.article div#comments > div.comment-item"
         )
 
-        if elements:
-            result = {}
+        # 需要满足超过一个人评论
+        if elements and len(elements) > 1:
+            result = []
             # 判断用户是否已经看过影片需要从页面链接中 status 值判断
             if re.search("status=(\w)", response.url).group(1) == "F":
                 watched = False 
@@ -795,7 +798,7 @@ class Comments:
                 date = element.css(
                         "div.comment span.comment-info > span.comment-time::attr(title)"
                     ).extract_first().strip()
-                cid = element.css("::attr(data-cid)").extract_first().strip()
+                comment_id = element.css("::attr(data-cid)").extract_first().strip()
                 rate = element.css(
                         "div.comment  span.comment-info > span.rating::attr(class)"
                     ).re("\d+")
@@ -808,8 +811,9 @@ class Comments:
                         .extract_first().strip()))
                 
 
-                result[cid] = cls.__short(name=name, uid=uid, upic=upic, watched=\
-                    watched, date=date, cid=cid, rate=rate, content=content, thumb=thumb)
+                result.append(cls.__short(name=name, uid=uid, upic=upic, watched=\
+                    watched, date=date, comment_id=comment_id, rate=rate, \
+                        content=content, thumb=thumb))
             # 如果有下一页需要和结果一起传出
             has_next = response.css(
                 "div#wrapper div.article div#comments > div#paginator > a.next::attr(href)"
@@ -825,7 +829,7 @@ class Comments:
 
 
     @classmethod
-    def extract_reviews(cls, response):
+    def extract_reviews(cls, response, another=True):
         """
         提取长评论信息
 
@@ -834,77 +838,154 @@ class Comments:
         等级), 用户评论短内容(short_content，保留了显示内容), 用户评论完整内容可以请求的 
         URL (content_url) 其他用户支持的数量(thumb), 不支持的数量(down)，恢复数量(reply)
 
+        Args:
+        --------
+        another: 布尔值，如果是使用 request_html 解析得到的结果，response 对象方法存在差异，
+            requests_html 调用的是 html 模块下 xpath 或者 pq 方法处理
+
         Results:
         ------------
-        result: dict, key 是评论的 id，nametuple 保存 value，包括了 name, uid, upic,
+        result: 列表，nametuple 保存 value，包括了 name, uid, upic,
             date, cid, rate, content, thumb
         next_: boolean 或者 str，返回下一页 URL，如果没有下一页那么返回 False
         """
-        elements = response.css("div.review-list > div")
-
-        if elements:
-            result = {}
-            for element in elements:
-                name = element.css("header.main-hd > a.name::text") \
-                    .extract_first().strip()
-                uid = element.css("header.main-hd > a.name::attr(href)") \
-                    .extract_first().strip() 
-
-                upic = element.css("header.main-hd > a.avator > img::attr(src)") \
-                    .extract_first().strip()
-
-                date = element.css("header.main-hd > span.main-meta::text") \
-                    .extract_first().strip()
-                
-                cid = element.css("::attr(data-cid)") \
-                    .extract_first().strip()
-                
-                rate = element.css(
-                        "header.main-hd > span.main-title-rating::attr(class)"
-                    ).re("\d+")
-        
-                # 如果没有评分值，则返回 None
-                rate = None if not rate else int(float(rate[0].strip())) // 10
-
-                short_content = "".join(i.strip() for i in element.css(
-                        "div.main-bd > div.review-short > div.short-content::text"
-                    ).extract())
-
-                title = element.css("div.main-bd > h2 > a::text").extract_first().strip()
-                content_url = element.css("div.main-bd > h2 > a::attr(href)") \
-                    .extract_first().strip()
-                
-                thumb = element.css("div.main-bd > div.action a[title='有用'] > span::text") \
-                    .extract_first().strip()
-
-                thumb = 0 if not thumb else int(float(thumb.strip()))
-
-                down = element.css("div.main-bd > div.action a[title='没用'] > span::text") \
-                    .extract_first().strip()
-
-                down = 0 if not down else int(float(down.strip()))
-
-                reply = element.css("div.main-bd > div.action a.reply::text").re("\d+")
-
-                reply = 0 if not reply else int(float(reply[0].strip()))
-
-                result[cid] = cls.__review(name=name, uid=uid, upic=upic, \
-                    date=date, cid=cid, rate=rate, short_content=short_content,
-                    title=title, content_url=content_url, thumb=thumb, down=down,
-                    reply=reply)
-
-                        # 如果有下一页需要和结果一起传出
-            has_next = response.css(
-                "div#wrapper div#content div.article > div.paginator > span.next >a::attr(href)"
-                ).extract_first()
-
-            if has_next:
-                next_ = re.sub("^(.*reviews).*$", 
-                    lambda x: x.group(1) + has_next.strip(), response.url)
-            else:
-                next_ = False
+        if another:
+            elements = response.html.pq("div.review-list > div")
             
-            return result, next_  
+            if elements:
+                result = []
+
+                for element in elements:
+                    # 仅筛选有 data-cid 属性的 element
+                    if "data-cid" in element.attrib:
+                        comment_id = element.attrib["data-cid"]
+                        name = cls.requests_html_parse(element, \
+                            "./div/header[@class='main-hd']/a[@class='name']/text()")
+                        uid = cls.requests_html_parse(element, \
+                            "./div/header[@class='main-hd']/a[@class='name']/attribute::href")
+                        upic = cls.requests_html_parse(element, \
+                            "./div/header[@class='main-hd']/a[@class='avator']/img/attribute::src")
+                        date = cls.requests_html_parse(element, \
+                            "./div/header[@class='main-hd']/span[@class='main-meta']/text()")
+                        rate = cls.requests_html_parse(element, \
+                            "./div/header[@class='main-hd']/span[contains(attribute::class, 'main-title-rating')]/attribute::class")
+
+                        if rate:
+                            rate = int(re.search("(\d+)", rate).group(1))
+                        else:
+                            rate = 0
+                        
+                        content = "".join(re.sub("^\)|\($", "", i).strip() \
+                            for i in element.xpath("./div/div[@class='main-bd']/div[@class='review-short']/div/text()")
+                        )
+                        title = cls.requests_html_parse(element, \
+                            "./div/div[@class='main-bd']/h2/a/text()")
+                        content_url = cls.requests_html_parse(element, \
+                            "./div/div[@class='main-bd']/h2/a/attribute::href")
+                        thumb = cls.requests_html_parse(element, \
+                            "./div/div[@class='main-bd']/div[@class='action']//span[contains(attribute::id, 'useful_count')]/text()")
+                        
+                        if thumb:
+                            thumb = int(thumb)
+                        else:
+                            thumb = 0
+                        
+                        down = cls.requests_html_parse(element, \
+                            "./div/div[@class='main-bd']/div[@class='action']//span[contains(attribute::id, 'useless_count')]/text()")
+
+                        if down:
+                            down = int(down)
+                        else:
+                            down = 0
+                        
+                        reply = cls.requests_html_parse(element, \
+                            "./div/div[@class='main-bd']/div[@class='action']/a[contains(attribute::class, 'reply')]/text()")
+                        
+                        if reply:
+                            reply = int(re.search("(\d+)", reply).group(1))
+                        else:
+                            reply = 0
+                        result.append(cls.__review(name=name, uid=uid, upic=upic, \
+                            date=date, comment_id=comment_id, rate=rate, content=content,
+                            title=title, content_url=content_url, thumb=thumb, down=down,
+                            reply=reply))
+                # 如果有下一页需要和结果一起传出
+                has_next = response.html.pq("span.next > link")
+                if has_next:
+                    next_ = re.sub("^(.*reviews).*$", 
+                        lambda x: x.group(1) + has_next[0].attrib["href"].strip(), response.url)
+                else:
+                    next_ = False
+                return  result, next_
+        else:
+            elements = response.css("div.review-list > div")
+
+            if elements:
+                result = []
+                for element in elements:
+                    name = element.css("header.main-hd > a.name::text") \
+                        .extract_first().strip()
+                    uid = element.css("header.main-hd > a.name::attr(href)") \
+                        .extract_first().strip() 
+
+                    upic = element.css("header.main-hd > a.avator > img::attr(src)") \
+                        .extract_first().strip()
+
+                    date = element.css("header.main-hd > span.main-meta::text") \
+                        .extract_first().strip()
+                    
+                    comment_id = element.css("::attr(data-cid)") \
+                        .extract_first().strip()
+                    
+                    rate = element.css(
+                            "header.main-hd > span.main-title-rating::attr(class)"
+                        ).re("\d+")
+            
+                    # 如果没有评分值，则返回 None
+                    rate = None if not rate else int(float(rate[0].strip())) // 10
+
+                    content = "".join(i.strip() for i in element.css(
+                            "div.main-bd > div.review-short > div.short-content::text"
+                        ).extract())
+
+                    title = element.css("div.main-bd > h2 > a::text").extract_first().strip()
+                    content_url = element.css("div.main-bd > h2 > a::attr(href)") \
+                        .extract_first().strip()
+                    
+                    thumb = element.css("div.main-bd > div.action a[title='有用'] > span::text") \
+                        .extract_first().strip()
+
+                    thumb = 0 if not thumb else int(float(thumb.strip()))
+
+                    down = element.css("div.main-bd > div.action a[title='没用'] > span::text") \
+                        .extract_first().strip()
+
+                    down = 0 if not down else int(float(down.strip()))
+
+                    reply = element.css("div.main-bd > div.action a.reply::text").re("\d+")
+
+                    reply = 0 if not reply else int(float(reply[0].strip()))
+
+                    result.append(cls.__review(name=name, uid=uid, upic=upic, \
+                        date=date, comment_id=comment_id, rate=rate, content=content,
+                        title=title, content_url=content_url, thumb=thumb, down=down,
+                        reply=reply))
+
+                # 如果有下一页需要和结果一起传出
+                has_next = response.css(
+                    "div#wrapper div#content div.article > div.paginator > span.next >a::attr(href)"
+                    ).extract_first()
+
+                if has_next:
+                    next_ = re.sub("^(.*reviews).*$", 
+                        lambda x: x.group(1) + has_next.strip(), response.url)
+                else:
+                    next_ = False
+                
+                return result, next_  
+        
+        # 如果没有得到结果，那么将返回空列表和 False
+        return  [], False
 
 
     @classmethod
@@ -922,6 +1003,20 @@ class Comments:
         else:
             raise ValueConsistenceError(f"can't get review: {response.url}")
 
+
+    @classmethod
+    def requests_html_parse(cls, element, query):
+        """解析 requests_html 包获得数据
+
+        需要注意是使用 xpath 的方式解析数据
+        """
+        result = element.xpath(query)
+
+        if result:
+            result = result[0].strip()
+        else:
+            result = None
+        return result
 
 
 class People:
