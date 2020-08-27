@@ -174,9 +174,6 @@ class DouBanSeriesInfo(Base):
             comment="提取豆瓣对当前内容推荐对相似条目"
     )
 
-    # episode_info = sqlalchemy.Column(
-    #     sqlalchemy.VARCHAR(300, convert_unicode=True), comment="提取电视剧的各集剧情信息"
-    # )
     create_time = sqlalchemy.Column(
         sqlalchemy.DATETIME, server_default=func.now(), comment='首次爬取数据'
     )
@@ -186,9 +183,10 @@ class DouBanSeriesInfo(Base):
     )
     
 
-    # episodes = relationship("DouBanEpisodeInfo", back_populates="sid")
-    # workers = relationship("DouBanSeriesWorker", back_populates="sid")
-    # picutres = relationship("DouBanSeriesPic", back_populates="sid")
+    episodes = relationship("DouBanEpisodeInfo", backref="episode_info", lazy="joined")
+    workers = relationship("DouBanSeriesWorker", backref="worker", lazy="joined")
+    picutres = relationship("DouBanSeriesPic", backref="picture", lazy="joined")
+    awards = relationship("DouBanSeriesAwards", backref="award", lazy="joined")
 
     def __repr__(self):
         format = "<%s data model object at %s>"
@@ -220,7 +218,7 @@ class DouBanEpisodeInfo(Base):
     id = sqlalchemy.Column(sqlalchemy.BigInteger, primary_key=True,autoincrement=True)
     sid = sqlalchemy.Column(
         sqlalchemy.VARCHAR(20), \
-        # sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
+        sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
         nullable=False, comment='豆瓣影视剧条目 ID'
     )
     episode = sqlalchemy.Column(TINYINT(3, unsigned=True), nullable=False, comment='多季剧集集数')
@@ -279,7 +277,7 @@ class DouBanSeriesWorker(Base):
 
     sid = sqlalchemy.Column(
         sqlalchemy.VARCHAR(20), \
-        # sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
+        sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
         nullable=False, comment='豆瓣影视剧条目 ID'
     )
     
@@ -340,7 +338,7 @@ class DouBanSeriesPic(Base):
 
     sid = sqlalchemy.Column(
         sqlalchemy.VARCHAR(20), \
-        # sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
+        sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
         nullable=False, comment='豆瓣影视剧条目 ID'
     )
 
@@ -477,7 +475,7 @@ class DouBanSeriesPerson(Base):
 
 class DouBanSeriesAwards(Base):
     """影视获奖列表信息"""
-    __tablename__ = "awards"
+    __tablename__ = "award"
     __table_args__ = {"mysql_engine": "InnoDB"} 
 
     id = sqlalchemy.Column(
@@ -488,7 +486,7 @@ class DouBanSeriesAwards(Base):
 
     sid = sqlalchemy.Column(
         sqlalchemy.VARCHAR(20), \
-        # sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
+        sqlalchemy.ForeignKey("series_info.series_id", onupdate="CASCADE", ondelete="RESTRICT"), \
         nullable=False, comment='豆瓣影视剧条目 ID'
     )
 
