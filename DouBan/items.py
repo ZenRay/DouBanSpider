@@ -127,7 +127,7 @@ class DouBanCommentsItemM(scrapy.Item):
     影评：对影视内容的长评论
     综合短评论和影评的字段信息如下:
         * sid 影视 ID
-        * name 用户名
+        * uname 用户名
         * uid 用户链接
         * upic 用户头像
         * date 用户评论日期
@@ -135,26 +135,30 @@ class DouBanCommentsItemM(scrapy.Item):
         * title 影评的标题，短评是没有标题的
         * content 用户评论的内容
         * content_url 影评的 URL，可以获取影评全文
+        * content_full 影评全文
         * rate 评分
         * thumb 赞同评论的用户数量
         * down 不赞同该评论的数量
         * reply 回复该评论的数量
         * watched 短评用户是否已经观看过影视内容，False 表示想看，True 表示看过
+        * type 评论的类型，包括了两个方面，短评论和影评
     """
     sid = scrapy.Field()    
-    name = scrapy.Field() 
+    uname = scrapy.Field() 
     uid = scrapy.Field() 
     upic = scrapy.Field()   
     date = scrapy.Field()   
     comment_id = scrapy.Field() 
     title = scrapy.Field()  
     content = scrapy.Field()    
-    content_url = scrapy.Field() 
+    content_url = scrapy.Field()
+    content_full = scrapy.Field()
     rate = scrapy.Field()   
     thumb = scrapy.Field()  
     down = scrapy.Field()   
     reply = scrapy.Field()   
-    watched = scrapy.Field()    
+    watched = scrapy.Field()
+    type = scrapy.Field() 
 
 
 
