@@ -47,15 +47,29 @@ class Config:
         NotImplemented
 
 
+    @property
+    def mongo(self):
+        """MongoDB 全局配置信息
+        """
+        try:
+            self.__check_section("mongo")
+            config = {key: self.parser.get("mongo", key) for key in \
+                self.parser.options("mongo")}
+        except LookupError as err:
+            self.__check_section("mongodb")
+            config = {key: self.parser.get("mongodb", key) for key in \
+                self.parser.options("mongodb")}
+
+        return config
+
+
     def __check_section(self, section):
         """检测 section
 
         检查 section 是否存在
         """
-        if not self.parser.has_section("mysql"):
-            raise LookupError("There is not mysql Secton in configuration")
-        else:
-            pass
+        if not self.parser.has_section(section):
+            raise LookupError(f"There is not {section} Secton in configuration")
 
 
 configure = Config(file)
