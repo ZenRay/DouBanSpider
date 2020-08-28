@@ -9,6 +9,8 @@ import pymysql
 import copy
 import logging
 import json
+import bson
+import pymongo
 from os import path
 from scrapy.exceptions import DropItem
 
@@ -19,6 +21,7 @@ from DouBan.items import (
     DouBanPeopleItem, DouBanPhotosItem, DouBanEpisodeItem
 )
 from DouBan.database.manager.datamodel import *
+from DouBan.database.conf import configure
 from DouBan.database.manager import DataBaseManipulater
 from DouBan.utils.exceptions import InappropriateArgument
 
@@ -451,7 +454,6 @@ class DouBanPeoplePipeline(BasePipeline):
             pass
         
         
-
 class DouBanPicturePipeline(BasePipeline):
     def process_item(self, item, spider):
         """处理豆瓣影视海报、剧照以及壁纸
@@ -488,3 +490,41 @@ class DouBanEpisodePipeline(BasePipeline):
             self.logger.info(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
 
         # raise DropItem(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
+
+
+class DouBanCommentPipelineM(BasePipeline):
+    def open_spider(self, spider):
+        # import ipdb; ipdb.set_trace()
+        port = configure.parser.getint("mongodb", "port")
+        host = configure.parser.get("mongodb", "host")
+        tz_aware = configure.parser.getboolean("mongodb", "tz_aware")
+        minPoolSize = configure.parser.getint("mongodb", "minPoolSize")
+        database = configure.parser.get("mongodb", "database")
+        collection = configure.parser.get("mongodb", "collection")
+
+        self.mongo_client = pymongo.MongoClient(port=port, host=host, \
+            tz_aware=tz_aware, minPoolSize=minPoolSize)
+        self.database = self.mongo_client[database]
+        self.collection = self.database[collection]
+        self.logger.info("连接到 MongoDB 服务器")
+
+    
+    def process_item(self, item, spider):
+        """豆瓣评论数据
+
+        豆瓣评论数据是写入 MongoDB 中，保存数据的 connection 是 comments
+        """
+        query_item = self.collection.find_one({"comment_id": item['comment_id']})
+        if query_item:
+            self.collection.update_one({"_id": query_item.get('_id')}, {"$set": dict(item)})
+            self.logger.info(f"更新评论数据: {item['comment_id']}")
+        else:
+            self.collection.insert_one(dict(item))
+            self.logger.info(f"插入评论数据: {item['comment_id']}")
+        
+        return item
+
+    
+    def close_spider(self, spider):
+        # 关闭链接
+        self.mongo_client.close()
