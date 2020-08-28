@@ -6,10 +6,24 @@
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 import random
 import logging
+import base64
 from scrapy import signals
-from DouBan.utils.login import *
 
+from DouBan.utils.login import *
+from DouBan.utils.proxy import configure, request_abuyun
+
+
+from scrapy import signals
+from twisted.internet import defer
+from twisted.internet.error import (
+    TimeoutError, DNSLookupError, ConnectionRefusedError, ConnectionDone, 
+    ConnectError, ConnectionLost, TCPTimedOutError
+)
+from scrapy.http import HtmlResponse
+from twisted.web.client import ResponseFailed
+from scrapy.core.downloader.handlers.http11 import TunnelError
 from scrapy.downloadermiddlewares.retry import RetryMiddleware
+from scrapy.utils.response import response_status_message
 
 class DoubanSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
@@ -136,6 +150,147 @@ class UserAgentDownloaderMiddleware(object):
         ua = random.choice(self.user_agents)
         self.logger.debug('使用User-Agent ' + ua)
         request.headers['User-Agent'] = ua
+
+
+class ABuYunDynamicProxyMiddleware:
+    """使用阿布云动态代理通道
+    """
+    def __init__(self):
+        proxyUser = configure.parser.get("proxy", "PROXY_USER")
+        proxyPass = configure.parser.get("proxy", "PROXY_PASS")
+
+        # 单次请求代理数量
+        self.proxy_count = configure.parser.getint("proxy", "PROXY_COUNT")
+        self.proxyServer = configure.parser.get("proxy", "PROXY_SERVER")
+        self.proxyAuth = "Basic " + base64.urlsafe_b64encode(
+            bytes((proxyUser + ":" + proxyPass), "ascii")).decode("utf8")
+
+    def process_request(self, request, spider):
+        request.meta["proxy"] = self.proxyServer
+        request.headers["Proxy-Authorization"] = self.proxyAuth
+        
+    
+class ABuYunHighQuantityProxyMiddleware:
+    """使用阿布云高质量代理服务
+    """
+    def __init__(self):
+        # get proxies
+        self.proxy_count = configure.parser.getint("proxy", "PROXY_COUNT")
+        data = request_abuyun(cnt=1)
+
+        self.proxies = data["proxies"] if "proxy" in data else []
+
+    def process_request(self, request, spider):
+        if len(self.proxies) == 0:
+            spider.logger.info("代理数量消耗殆尽")
+
+        # 随机选择一个代理
+        proxy_selected = random.choice(self.proxies)
+        proxy = "http://" + proxy_selected
+        request.meta["proxy"] = proxy
+
+        spider.logger.info('Use Proxy: ' + proxy)
+
+
+    def process_response(self, request, response, spider):
+        """处理异常请求结果
+        """
+        if int(response.status) not in [200, 301, 302]:
+            
+            data = request_abuyun(cnt=self.proxy_count)
+
+            proxy = data["proxies"]
+            request.meta["proxy"] = random.choice(proxy)
+            self.logger.info("Use New Proxy: {}".format(proxy))
+            return request
+        return response
+
+
+   
+
+class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
+    """
+    使用阿布云动态代理进行重试
+    """
+    # logger = logging.getLogger(__name__)
+    EXCEPTIONS_TO_RETRY = (defer.TimeoutError, TimeoutError, DNSLookupError,
+                           ConnectionRefusedError, ConnectionDone, ConnectError,
+                           ConnectionLost, TCPTimedOutError, ResponseFailed,
+                           IOError, TunnelError)
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        settings = crawler.settings
+        return cls(
+            max_retry_times=settings.getint('RETRY_TIMES', 5),
+        )
+        
+    def __init__(self, max_retry_times):
+        proxyUser = configure.parser.get("proxy", "PROXY_USER")
+        proxyPass = configure.parser.get("proxy", "PROXY_PASS")
+        
+        # 单次请求代理数量
+        self.proxy_count = configure.parser.getint("proxy", "PROXY_COUNT")
+        self.proxyServer = configure.parser.get("proxy", "PROXY_SERVER")
+        self.proxyAuth = "Basic " + base64.urlsafe_b64encode(
+            bytes((proxyUser + ":" + proxyPass), "ascii")).decode("utf8")
+        self.max_retry_times = max_retry_times
+        
+
+
+    def process_response(self, request, response, spider):
+        if str(response.status).startswith("4"):
+            request.meta["proxy"] = self.proxyServer
+
+            request.headers["Proxy-Authorization"] = self.proxyAuth
+            reason = response_status_message(response.status)
+            return self._retry(request, reason, spider) or response
+        elif str(response.status).startswith("3"):
+            spider.logger.info("Acticate Antispider")
+
+            request.meta["proxy"] = self.proxyServer
+
+            request.headers["Proxy-Authorization"] = self.proxyAuth
+            reason = response_status_message(response.status)
+            return self._retry(request, reason, spider) or response
+
+        return response
+
+
+    def process_exception(self, request, exception, spider):
+        if isinstance(exception, self.EXCEPTIONS_TO_RETRY):
+            spider.logger.debug("Catch Exception: {}".format(exception))
+            
+            data = request_abuyun(cnt=self.proxy_count)
+            proxy = data["proxies"]
+            request.meta["proxy"] = random.choice(proxy)
+
+            return self._retry(request, exception, spider)
+            
+
+
+
+
+class RandomDelayMiddleware:
+    """设置随机延迟时间
+    
+    """
+    def __init__(self, delay):
+        self.delay = delay
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        delay = crawler.spider.settings.get("RANDOM_DELAY", 4)
+        if not isinstance(delay, int):
+            raise ValueError("RANDOM_DELAY need a int")
+        
+        return cls(delay)
+
+    def process_request(self, request, spider):
+        delay = random.randint(1, self.delay)
+        spider.logger.info("{name} Delay: {time}s".format(
+            name=spider.name, time=delay))
+        time.sleep(delay)
 
 
 class CookiesRetryDownloaderMidddleware(RetryMiddleware):
