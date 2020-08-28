@@ -82,6 +82,7 @@ ITEM_PIPELINES = {
     "DouBan.pipelines.DouBanWorkerPipeline": 203,
     "DouBan.pipelines.DouBanEpisodePipeline": 204,
     "DouBan.pipelines.DouBanPicturePipeline": 205,
+    "DouBan.pipelines.DouBanCommentPipelineM": 206,
 
     # "DouBan.pipelines.DoubanStoragePipeline": 251,
 #    'DouBan.pipelines.DoubanPipeline': 300,
@@ -117,6 +118,8 @@ LOG_LEVEL = "INFO"
 LOG_FILE = path.join(path.dirname(__file__), \
     "log/douban_{}.log".format(time.strftime("%Y%m%d", time.localtime())))
 
+# retry
+RETRY_TIMES = 5
 
 # DataBase configuration
 DATABASE_CONF = {
