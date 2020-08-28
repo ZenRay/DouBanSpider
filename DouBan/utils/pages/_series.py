@@ -743,20 +743,20 @@ class Comments:
 
     Properties:
     -------------
-    __short: 影片短评，name 用户姓名，uid 用户链接，upic 用户头像，date 用户评论日期
+    __short: 影片短评，uname 用户姓名，uid 用户链接，upic 用户头像，date 用户评论日期
         comment_id 用户评论 ID，content 用户评论的内容，thumb 赞同该评论用户，watched 用户是否已
         经观看-因为影片的评论包括了想看和已看两种类型
-    __review: 影片评论，针对影片发表长评论。name 用户姓名，uid 用户链接，upic 用户头像，
+    __review: 影片评论，针对影片发表长评论。uname 用户姓名，uid 用户链接，upic 用户头像，
         date 用户评论日期，comment_id 用户评论 ID，content 用户评论的部分内容（完整内容需要
         请求其他页面），title 评论标题，content_url 可以获取到详细评论的 URL，thumb 赞同
         该评论的数量，down 不赞同该评论的数量，reply 回复该评论的数量
     """
     __short = namedtuple("short_comment", \
-        ["name", "uid", "upic", "date", "comment_id", "rate", "content", "thumb", \
+        ["uname", "uid", "upic", "date", "comment_id", "rate", "content", "thumb", \
             "watched"])
 
     __review = namedtuple("review", \
-        ["name", "uid", "upic", "date", "comment_id", "rate", "content", "title", \
+        ["uname", "uid", "upic", "date", "comment_id", "rate", "content", "title", \
             "content_url", "thumb", "down", "reply"])
     @classmethod
     def extract_short_comment(cls, response):
@@ -789,7 +789,7 @@ class Comments:
                 raise ValueConsistenceError(f"can't extract watched information")
 
             for element in elements:
-                name = element.css("div.avatar > a::attr(title)") \
+                uname = element.css("div.avatar > a::attr(title)") \
                         .extract_first().strip() 
                 uid = element.css("div.avatar > a::attr(href)") \
                         .extract_first().strip()
@@ -811,7 +811,7 @@ class Comments:
                         .extract_first().strip()))
                 
 
-                result.append(cls.__short(name=name, uid=uid, upic=upic, watched=\
+                result.append(cls.__short(uname=uname, uid=uid, upic=upic, watched=\
                     watched, date=date, comment_id=comment_id, rate=rate, \
                         content=content, thumb=thumb))
             # 如果有下一页需要和结果一起传出
@@ -833,7 +833,7 @@ class Comments:
         """
         提取长评论信息
 
-        获取到的信息包括用户姓名(name), 用户 ID(uid), 用户头像链接(upic), 
+        获取到的信息包括用户姓名(uname), 用户 ID(uid), 用户头像链接(upic), 
         用户评论日期(date), 用户评论的 ID(cid, 豆瓣页面获取), 用户评分(rate，保留 5 星评
         等级), 用户评论短内容(short_content，保留了显示内容), 用户评论完整内容可以请求的 
         URL (content_url) 其他用户支持的数量(thumb), 不支持的数量(down)，恢复数量(reply)
@@ -859,7 +859,7 @@ class Comments:
                     # 仅筛选有 data-cid 属性的 element
                     if "data-cid" in element.attrib:
                         comment_id = element.attrib["data-cid"]
-                        name = cls.requests_html_parse(element, \
+                        uname = cls.requests_html_parse(element, \
                             "./div/header[@class='main-hd']/a[@class='name']/text()")
                         uid = cls.requests_html_parse(element, \
                             "./div/header[@class='main-hd']/a[@class='name']/attribute::href")
@@ -905,7 +905,7 @@ class Comments:
                             reply = int(re.search("(\d+)", reply).group(1))
                         else:
                             reply = 0
-                        result.append(cls.__review(name=name, uid=uid, upic=upic, \
+                        result.append(cls.__review(uname=uname, uid=uid, upic=upic, \
                             date=date, comment_id=comment_id, rate=rate, content=content,
                             title=title, content_url=content_url, thumb=thumb, down=down,
                             reply=reply))
@@ -923,7 +923,7 @@ class Comments:
             if elements:
                 result = []
                 for element in elements:
-                    name = element.css("header.main-hd > a.name::text") \
+                    uname = element.css("header.main-hd > a.name::text") \
                         .extract_first().strip()
                     uid = element.css("header.main-hd > a.name::attr(href)") \
                         .extract_first().strip() 
@@ -966,7 +966,7 @@ class Comments:
 
                     reply = 0 if not reply else int(float(reply[0].strip()))
 
-                    result.append(cls.__review(name=name, uid=uid, upic=upic, \
+                    result.append(cls.__review(uname=uname, uid=uid, upic=upic, \
                         date=date, comment_id=comment_id, rate=rate, content=content,
                         title=title, content_url=content_url, thumb=thumb, down=down,
                         reply=reply))
