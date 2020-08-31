@@ -77,30 +77,25 @@ class SeriesSpider(scrapy.Spider):
                 yield scrapy.Request(url, callback=self.direct_parse_page)
         
 
-        # TODO: 需要完成对存储在表中的影视内容进行爬去和解析——用于解析详情内容
-        if global_config.getboolean("addictive_series", "check_table"):
-            # 数据管理对象
+        # * 需要完成对存储在表中的影视内容进行爬去和解析——用于解析详情内容
+        if global_config.getboolean("douban_seed", "check_table"):
+            # load 数据管理对象
             from DouBan.database.manager import DataBaseManipulater
             from DouBan.database.manager.datamodel import DouBanSeriesSeed
             manipulater = DataBaseManipulater(echo=True)
             url = "https://movie.douban.com/subject/{seed}/"
             # 从种子数据库中提取未爬取的数据
             with manipulater.get_session() as session:
-                # import ipdb; ipdb.set_trace()
-                # seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0).order_by(DouBanSeriesSeed.create_time.desc())
-                # ! debugger
-                # import numpy as np
-                # for seed in seeds.all():
-                #     yield scrapy.Request(url.format(seed=seed.series_id), \
-                #         callback=self.detail_page, meta={"session": session})
+                seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0).order_by(DouBanSeriesSeed.create_time.desc())
 
-                for seed in ["1292052"]: #seeds.all():
-                    yield scrapy.Request(url.format(seed=seed), \
-                        callback=self.detail_page, meta={"session": session})
+                for seed in seeds.all():
+                    yield scrapy.Request(url.format(seed=seed.series_id), \
+                        callback=self.detail_page)
                     
-                    # ! Debugger
-                    break
-
+                    # 开发阶段只测试一个源
+                    if global_config.getboolean("env", "development"):
+                        return 
+                    
 
         # * 仅获取到电视剧相关页面的内容保存到数据库以备下一步解析用，不需要进行下一级页面解析
         if global_config.getboolean("addictive_series", "crawl_new"):
@@ -113,6 +108,10 @@ class SeriesSpider(scrapy.Spider):
                     
                     # 下一页
                     start += 1
+                    
+                    # 开发阶段只测试一个源
+                    if global_config.getboolean("env", "development"):
+                        return 
                     
 
     def list_page(self, response):
@@ -140,8 +139,6 @@ class SeriesSpider(scrapy.Spider):
         """
         处理详情页面的内容
         """
-        # from scrapy.shell import inspect_response
-        # inspect_response(response, self)
         item = DouBanDetailItem()
         item["series_id"] = re.search("subject/(\d{3,})", response.url).group(1)
         item["name"] = Details.extract_title(response).name
@@ -234,9 +231,7 @@ class SeriesSpider(scrapy.Spider):
         # 评论内容
         url = f"https://movie.douban.com/subject/{item['series_id']}/"
         for query in ["comments?status=P", "comments?status=F", "reviews"]:
-            # 影评需要修改 headers
             if query.startswith("reviews"):
-                continue
                 yield scrapy.Request(url+query, callback=self.parse_comments)
             else:
                 yield scrapy.Request(url+query, callback=self.parse_comments)
@@ -411,10 +406,6 @@ class SeriesSpider(scrapy.Spider):
 
 
     def parse_comments(self, response):
-        # import ipdb; ipdb.set_trace()
-        # from scrapy.shell import inspect_response
-        # inspect_response(response, self)
-        
         if "comments" in response.url:
             datum, next_ = Comments.extract_short_comment(response)
         else:
@@ -427,7 +418,22 @@ class SeriesSpider(scrapy.Spider):
         for data in datum:
             item = DouBanCommentsItemM(**{field: data._asdict().get(field) if field != "sid" else sid \
                 for field in DouBanCommentsItemM.fields})
-            # import ipdb; ipdb.set_trace()
+            # 根据 watched 字段是否为布尔值作为判断是短评论还是影评
+            if isinstance(item['watched'], bool):
+                item['type'] = "短评论"
+                item['content_full'] = None
+            else:
+                item['type'] = "影评"
+                # 获取影评全文
+                url = f"https://movie.douban.com/j/review/{item['comment_id']}/full"
+                with requests_html.HTMLSession() as session:
+                    res = session.get(url)
+                    if res.status_code == 200:
+                        content = res.json().get('html')
+                        item['content_full'] = content
+                    else:
+                        item['content_full'] = None
+
             yield item
         
         # 下一页
@@ -448,35 +454,3 @@ class SeriesSpider(scrapy.Spider):
                 result = base64.b64encode(res.content)
         
         return result
-
-
-#* 需要再次请求的信息
-# ! 剧评(长评论)的页面 URL: https://movie.douban.com/subject/{影视 ID}/reviews
-    # 需要注意长评论的 headers 需要重新调整
-    """
-    headers = {
-        "Host": "movie.douban.com",
-        "Connection": "keep-alive",
-        "Cache-Control": "max-age=0",
-        "Upgrade-Insecure-Requests": "1",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-User": "?1",
-        "Sec-Fetch-Dest": "document",
-        "Referer": "https://movie.douban.com/subject/4739952/",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-    }
-    """
-    # ! 长评论接口，需要用 div[@data-cid] 的值去拼接: https://movie.douban.com/j/review/{data-cid}/full 
-    # id: 影视 ID
-
-# ! 电视剧各集详情，在详情页通过 id 和集数值拼接：https://movie.douban.com/subject/{影视 ID}/episode/{集数值}/
-    # id: 影视 ID
-        # episode: 集数
-        # title_cn: 当前集的中文标题
-        # title_origin: 当前集的原始标题，主要指原始语言标题
-        # play_date: 播放日期
-        # introduction: 内容简介
