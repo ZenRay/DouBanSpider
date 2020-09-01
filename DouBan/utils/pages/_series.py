@@ -776,10 +776,10 @@ class Comments:
         elements = response.css(
             "div#wrapper > div#content  div.article div#comments > div.comment-item"
         )
-
+        result = []
+        next_ = False
         # 需要满足超过一个人评论
         if elements and len(elements) > 1:
-            result = []
             # 判断用户是否已经看过影片需要从页面链接中 status 值判断
             if re.search("status=(\w)", response.url).group(1) == "F":
                 watched = False 
@@ -822,10 +822,8 @@ class Comments:
             if has_next:
                 next_ = re.sub("^(.*comments).*$", 
                     lambda x: x.group(1) + has_next.strip(), response.url)
-            else:
-                next_ = False
-            
-            return result, next_  
+                
+        return result, next_  
 
 
     @classmethod
