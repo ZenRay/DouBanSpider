@@ -98,7 +98,7 @@ class SeriesSpider(scrapy.Spider):
                     
 
         # * 仅获取到电视剧相关页面的内容保存到数据库以备下一步解析用，不需要进行下一级页面解析
-        if global_config.getboolean("addictive_series", "crawl_new"):
+        if global_config.getboolean("douban_seed", "crawl_new"):
             for tag in self.tags:
                 start = 0
                 while start <= self.end_pages:
@@ -182,7 +182,7 @@ class SeriesSpider(scrapy.Spider):
         item["cover"] = Details.extract_cover_url(response)
         
         # * 根据 crawl_img 选项判断是否需要将图片链接转换为实际请求的内容
-        if global_config.getboolean("addictive_series", "crawl_img"):
+        if global_config.getboolean("douban_seed", "crawl_img"):
             res = requests.get(item.cover)
             if int(res.status_code) == 200:
                 item["cover_content"] = base64.b64encode(res.content)
@@ -321,12 +321,11 @@ class SeriesSpider(scrapy.Spider):
         item["official_web"] = data.official_web
         item["introduction"] = data.introduction
 
-        yield item
 
         # 判断是否有上传图片，如果有图片那么需要请求图片
         if int(response.css("div#photos > div.hd span > a::text").re("全部(\d+)张")[0]) > 0:
             url = response.url + "photos/"
-            yield scrapy.Request(url, callback=self.parse_person_imgs)
+            yield scrapy.Request(url, callback=self.parse_person_imgs, meta={"data": item})
 
 
     def parse_person_imgs(self, response):
@@ -334,8 +333,8 @@ class SeriesSpider(scrapy.Spider):
 
         仅保留首页中的图片
         """
-        item = DouBanPeopleItem()
-        id = re.search("/celebrity/(\d+)/", response.url).group(1)
+        item = response.meta.pop("data")
+
         imgs = response.css(
             "div.article > ul.clearfix > li > div.cover img::attr(src)"
         ).extract()
@@ -352,7 +351,6 @@ class SeriesSpider(scrapy.Spider):
             contents = None
 
         item["imgs"] = imgs
-        item["id"] = id
         item["imgs_content"] = contents
 
         yield item
