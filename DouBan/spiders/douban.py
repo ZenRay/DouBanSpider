@@ -14,7 +14,7 @@ from os import path, remove
 from pyquery import PyQuery
 from lxml import etree
 from urllib import parse
-from DouBan.items import CoverImageItem, DoubanDataItem
+from DouBan.items import CoverImageItem, DouBanDetailItem
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
 from DouBan.settings import DATABASE_CONF
@@ -62,7 +62,7 @@ class DoubanSpider(scrapy.Spider):
     if not redis_connect.ping():
         raise ConnectionError("Can't connect the redis server. Checkout" + 
                             " network and config parameters.")
-    redis_key = DoubanDataItem.__name__
+    redis_key = DouBanDetailItem.__name__
 
     def start_requests(self):
         # if movies is not None, request the movies url and stop another requests
