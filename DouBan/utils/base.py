@@ -189,3 +189,19 @@ class BaseSpider(scrapy.Spider):
         super().log(message=message, level=level, **kwargs)
 
 
+
+
+class BasePipeline(object):
+    """Base Class For Pipeline
+    """
+    @property
+    def logger(self):
+        """Set property logger"""
+        logger = logging.getLogger(self.__class__.__name__)
+        return logging.LoggerAdapter(logger, {"SQLPipeline": self})
+
+
+    def log(self, message, level=logging.DEBUG, **kwargs):
+        """Run logger to display log information"""
+        self.logger.log(level, message, **kwargs)
+

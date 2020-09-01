@@ -139,3 +139,6 @@ movies.txt
 
 README.md
 DouBan/log/err_series.txt
+DouBan/log/err_default.txt
+tests
+DouBan/utils/proxy/conf/proxy.ini

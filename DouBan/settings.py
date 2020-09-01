@@ -60,11 +60,13 @@ DEFAULT_REQUEST_HEADERS = {
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-    'DouBan.middlewares.UserAgentDownloaderMiddleware': 2,
+    'DouBan.middlewares.ABuYunDynamicProxyMiddleware': 490,
+    'DouBan.middlewares.ABuYunDynamicProxyRetryMiddleware': 495,
+    'DouBan.middlewares.UserAgentDownloaderMiddleware': 3,
+    'DouBan.middlewares.RandomDelayMiddleware': 4,
     # "DouBan.middlewares.CookiesRetryDownloaderMidddleware": 100
     # 'DouBan.middlewares.ProxyDownloaderMiddleware': 555,
     # 'DouBan.middlewares.DoubanDownloaderMiddleware': 543,
-   
 }
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
@@ -75,7 +77,15 @@ DOWNLOADER_MIDDLEWARES = {
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    "DouBan.pipelines.ListPipeline": 200
+    # "DouBan.pipelines.ListPipeline": 200
+    "DouBan.pipelines.DouBanDetailPipeline": 200,
+    "DouBan.pipelines.DouBanAwardPipeline": 201,
+    "DouBan.pipelines.DouBanPeoplePipeline": 202,
+    "DouBan.pipelines.DouBanWorkerPipeline": 203,
+    "DouBan.pipelines.DouBanEpisodePipeline": 204,
+    "DouBan.pipelines.DouBanPicturePipeline": 205,
+    "DouBan.pipelines.DouBanCommentPipelineM": 206,
+
     # "DouBan.pipelines.DoubanStoragePipeline": 251,
 #    'DouBan.pipelines.DoubanPipeline': 300,
 }
@@ -110,6 +120,8 @@ LOG_LEVEL = "INFO"
 LOG_FILE = path.join(path.dirname(__file__), \
     "log/douban_{}.log".format(time.strftime("%Y%m%d", time.localtime())))
 
+# retry
+RETRY_TIMES = 5
 
 # DataBase configuration
 DATABASE_CONF = {
