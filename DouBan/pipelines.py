@@ -18,7 +18,7 @@ from DouBan.utils.base import BaseSQLPipeline, BasePipeline
 from DouBan.utils.hammers import extract1st_char
 from DouBan.items import (
     DouBanDetailItem, DouBanAwardItem, CoverImageItem, ListItem, DouBanWorkerItem,
-    DouBanPeopleItem, DouBanPhotosItem, DouBanEpisodeItem
+    DouBanPeopleItem, DouBanPhotosItem, DouBanEpisodeItem, DouBanCommentsItemM
 )
 from DouBan.database.manager.datamodel import *
 from DouBan.database.conf import configure
@@ -378,7 +378,7 @@ class DouBanDetailPipeline(BasePipeline):
         
         with manipulater.get_session() as session:
             # 根据全局配置参数 update_table 确认是否需要更新
-            if spider.config.getboolean("addictive_series", "update_table"):
+            if spider.config.getboolean("douban_seed", "update_table"):
                 temp = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.series_id==item["series_id"]).first()
                 if temp:
                     temp.crawled = True
@@ -390,7 +390,7 @@ class DouBanDetailPipeline(BasePipeline):
             session.merge(data)
             session.commit()
             self.logger.info(f"影视条目写入完成 {item['series_id']}: {item['name']}")
-        # raise DropItem(f"影视条目写入完成 {item['series_id']}: {item['name']}")
+
 
 
 
@@ -406,7 +406,6 @@ class DouBanAwardPipeline(BasePipeline):
             session.merge(data)
             session.commit()
             self.logger.info(f"获奖信息写入 awards 完成: {item['sid']}")
-        # raise DropItem(f"获奖信息写入 awards 完成: {item['sid']}")
 
 
 
@@ -427,11 +426,26 @@ class DouBanWorkerPipeline(BasePipeline):
             session.merge(data)
             session.commit()
             self.logger.info(f"演职人员信息写入 worker 完成: {item['sid']}")
-        # raise DropItem(f"演职人员信息写入 worker 完成: {item['sid']}")
 
 
 
 class DouBanPeoplePipeline(BasePipeline):
+    def open_spider(self, spider):
+        # import ipdb; ipdb.set_trace()
+        port = configure.parser.getint("mongodb", "port")
+        host = configure.parser.get("mongodb", "host")
+        tz_aware = configure.parser.getboolean("mongodb", "tz_aware")
+        minPoolSize = configure.parser.getint("mongodb", "minPoolSize")
+        database = configure.parser.get("mongodb", "database")
+        collection = configure.parser.get("mongodb", "person_collection")
+
+        self.mongo_client = pymongo.MongoClient(port=port, host=host, \
+            tz_aware=tz_aware, minPoolSize=minPoolSize)
+        self.database = self.mongo_client[database]
+        self.collection = self.database[collection]
+        self.logger.info("连接到 MongoDB 服务器")
+
+
     def process_item(self, item, spider):
         """处理豆瓣影视演职人员 Profile数据
         
@@ -442,16 +456,26 @@ class DouBanPeoplePipeline(BasePipeline):
         # 如果 DouBanPeopleItem 中没有 name 数据后，那么说明需要不需要传入到 MySQL 数据库
         # 该条数据是表示的是关于演职人员的 图片信息，数据是 array——解析的 item 来源是 
         # parse_person_imgs
-        if item.get("name", False):
-            with manipulater.get_session() as session:
-                data = DouBanSeriesPerson(**item)
-                session.merge(data)
-                session.commit()
-                self.logger.info(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
-                # raise DropItem(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
+        # * 需要将数据写入到 MongoDB 中
+        query_item = self.collection.find_one({"id": item['id']})
+        if query_item:
+            self.collection.update_one({"_id": query_item.get('_id')}, {"$set": dict(item)})
+            self.logger.info(f"更新演职人员数据(MongoDb): {item['id']}")
         else:
-            # TODO: 需要将数据写入到 MongoDB 中，尚未完成
-            pass
+            self.collection.insert_one(dict(item))
+            self.logger.info(f"插入演职人员数据(MongoDb): {item['id']}")
+        
+        with manipulater.get_session() as session:
+            del item['imgs'], item['imgs_content']
+            data = DouBanSeriesPerson(**item)
+            session.merge(data)
+            session.commit()
+            self.logger.info(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
+            
+
+    def close_spider(self, spider):
+        # 关闭链接
+        self.mongo_client.close()
         
         
 class DouBanPicturePipeline(BasePipeline):
@@ -467,7 +491,7 @@ class DouBanPicturePipeline(BasePipeline):
             session.merge(data)
             session.commit()
             self.logger.info(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
-        # raise DropItem(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
+        
 
 
 class DouBanEpisodePipeline(BasePipeline):
@@ -484,12 +508,11 @@ class DouBanEpisodePipeline(BasePipeline):
             if query:
                 data.id = query.id
             
-                
             session.merge(data)
             session.commit()
             self.logger.info(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
 
-        # raise DropItem(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
+        
 
 
 class DouBanCommentPipelineM(BasePipeline):
@@ -500,7 +523,7 @@ class DouBanCommentPipelineM(BasePipeline):
         tz_aware = configure.parser.getboolean("mongodb", "tz_aware")
         minPoolSize = configure.parser.getint("mongodb", "minPoolSize")
         database = configure.parser.get("mongodb", "database")
-        collection = configure.parser.get("mongodb", "collection")
+        collection = configure.parser.get("mongodb", "comments_collection")
 
         self.mongo_client = pymongo.MongoClient(port=port, host=host, \
             tz_aware=tz_aware, minPoolSize=minPoolSize)
@@ -514,6 +537,9 @@ class DouBanCommentPipelineM(BasePipeline):
 
         豆瓣评论数据是写入 MongoDB 中，保存数据的 connection 是 comments
         """
+        if not isinstance(item, DouBanCommentsItemM):
+            return item
+
         query_item = self.collection.find_one({"comment_id": item['comment_id']})
         if query_item:
             self.collection.update_one({"_id": query_item.get('_id')}, {"$set": dict(item)})
@@ -522,7 +548,6 @@ class DouBanCommentPipelineM(BasePipeline):
             self.collection.insert_one(dict(item))
             self.logger.info(f"插入评论数据: {item['comment_id']}")
         
-        return item
 
     
     def close_spider(self, spider):

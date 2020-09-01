@@ -5,8 +5,8 @@ import requests
 import time
 from .conf import configure
 
-QUANTITY_PROXY_LICENSE = configure.parser.get("proxy", "QUANTITY_PROXY_LICENSE")
-QUANTITY_PROXY_SECRET = configure.parser.get("proxy", "QUANTITY_PROXY_SECRET")
+QUANTITY_PROXY_LICENSE = configure.parser.get("abuyun", "QUANTITY_PROXY_LICENSE")
+QUANTITY_PROXY_SECRET = configure.parser.get("abuyun", "QUANTITY_PROXY_SECRET")
 
 
 

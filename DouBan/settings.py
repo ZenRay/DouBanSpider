@@ -60,11 +60,13 @@ DEFAULT_REQUEST_HEADERS = {
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-    'DouBan.middlewares.UserAgentDownloaderMiddleware': 2,
+    'DouBan.middlewares.ABuYunDynamicProxyMiddleware': 490,
+    'DouBan.middlewares.ABuYunDynamicProxyRetryMiddleware': 495,
+    'DouBan.middlewares.UserAgentDownloaderMiddleware': 3,
+    'DouBan.middlewares.RandomDelayMiddleware': 4,
     # "DouBan.middlewares.CookiesRetryDownloaderMidddleware": 100
     # 'DouBan.middlewares.ProxyDownloaderMiddleware': 555,
     # 'DouBan.middlewares.DoubanDownloaderMiddleware': 543,
-   
 }
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
