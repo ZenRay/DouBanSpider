@@ -156,18 +156,20 @@ class ABuYunDynamicProxyMiddleware:
     """使用阿布云动态代理通道
     """
     def __init__(self):
-        proxyUser = configure.parser.get("proxy", "PROXY_USER")
-        proxyPass = configure.parser.get("proxy", "PROXY_PASS")
+        proxyUser = configure.parser.get("abuyun", "PROXY_USER")
+        proxyPass = configure.parser.get("abuyun", "PROXY_PASS")
 
         # 单次请求代理数量
-        self.proxy_count = configure.parser.getint("proxy", "PROXY_COUNT")
-        self.proxyServer = configure.parser.get("proxy", "PROXY_SERVER")
+        self.proxyServer = configure.parser.get("abuyun", "PROXY_SERVER")
         self.proxyAuth = "Basic " + base64.urlsafe_b64encode(
-            bytes((proxyUser + ":" + proxyPass), "ascii")).decode("utf8")
+            bytes((proxyUser + ":" + proxyPass), "ascii")
+        ).decode("utf8")
+        # import ipdb; ipdb.set_trace()
 
     def process_request(self, request, spider):
         request.meta["proxy"] = self.proxyServer
         request.headers["Proxy-Authorization"] = self.proxyAuth
+        spider.logger.info(f"当前页面使用代理服务: {request.url}")
         
     
 class ABuYunHighQuantityProxyMiddleware:
@@ -175,7 +177,7 @@ class ABuYunHighQuantityProxyMiddleware:
     """
     def __init__(self):
         # get proxies
-        self.proxy_count = configure.parser.getint("proxy", "PROXY_COUNT")
+        self.proxy_count = configure.parser.getint("abuyun", "PROXY_COUNT")
         data = request_abuyun(cnt=1)
 
         self.proxies = data["proxies"] if "proxy" in data else []
@@ -226,12 +228,12 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
         )
         
     def __init__(self, max_retry_times):
-        proxyUser = configure.parser.get("proxy", "PROXY_USER")
-        proxyPass = configure.parser.get("proxy", "PROXY_PASS")
+        proxyUser = configure.parser.get("abuyun", "PROXY_USER")
+        proxyPass = configure.parser.get("abuyun", "PROXY_PASS")
         
         # 单次请求代理数量
-        self.proxy_count = configure.parser.getint("proxy", "PROXY_COUNT")
-        self.proxyServer = configure.parser.get("proxy", "PROXY_SERVER")
+        self.proxy_count = configure.parser.getint("abuyun", "PROXY_COUNT")
+        self.proxyServer = configure.parser.get("abuyun", "PROXY_SERVER")
         self.proxyAuth = "Basic " + base64.urlsafe_b64encode(
             bytes((proxyUser + ":" + proxyPass), "ascii")).decode("utf8")
         self.max_retry_times = max_retry_times
