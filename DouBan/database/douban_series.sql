@@ -182,7 +182,7 @@ CREATE TABLE `person` (
   `profession` varchar(40) DEFAULT NULL COMMENT '演职人员的职业名称，可能使用 / 分隔',
   `alias` varchar(160) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视演职人员姓名(非中文)',  
   `alias_cn` varchar(240) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视演职人员姓名(中文)',  
-  `family` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视演职人员家庭成员',   
+  `family` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视演职人员家庭成员',   
   `imdb_link` varchar(30) DEFAULT NULL COMMENT 'IMDB 数据中的链接',
   `official_web` varchar(150) DEFAULT NULL COMMENT '影视推广的官方网站',
   `introduction` varcahr(300) DEFAULT NULL COMMENT '人物信息简介',

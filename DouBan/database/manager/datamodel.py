@@ -434,7 +434,7 @@ class DouBanSeriesPerson(Base):
     )
 
     family = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(200, convert_unicode=True, collation="utf8mb4_general_ci"),
         default=None, comment="豆瓣影视演职人员家庭成员"
     )
 
