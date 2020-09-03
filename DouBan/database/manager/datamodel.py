@@ -282,7 +282,7 @@ class DouBanSeriesWorker(Base):
     )
     
     name = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(25, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(50, convert_unicode=True, collation="utf8mb4_general_ci"),
         nullable=False, comment='豆瓣影视演职人员姓名'
     )
     
