@@ -7,6 +7,7 @@
 import random
 import logging
 import base64
+import urllib
 from scrapy import signals
 
 from DouBan.utils.login import *
@@ -238,9 +239,21 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
             bytes((proxyUser + ":" + proxyPass), "ascii")).decode("utf8")
         self.max_retry_times = max_retry_times
         
+        # 添加 priority_adjust 属性才能调整重试策略
+        self.priority_adjust = max_retry_times
 
 
     def process_response(self, request, response, spider):
+        # 需要判断请求 URL 是否正确
+        exception_link = "https://sec.douban.com/b?r="
+        if exception_link in request.url:
+            url = request.url.replace(exception_link, "")
+            url = urllib.parse.unquote(url)
+            # 更新 URL
+            request = request.replace(url=url)
+            
+            spider.logger.error(f"触发安全机制，更换请求的 URL: {request.url}")
+            
         if str(response.status).startswith("4"):
             request.meta["proxy"] = self.proxyServer
 
@@ -263,11 +276,11 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
         if isinstance(exception, self.EXCEPTIONS_TO_RETRY):
             spider.logger.debug("Catch Exception: {}".format(exception))
             
-            data = request_abuyun(cnt=self.proxy_count)
-            proxy = data["proxies"]
-            request.meta["proxy"] = random.choice(proxy)
+            request.meta["proxy"] = self.proxyServer
 
-            return self._retry(request, exception, spider)
+            request.headers["Proxy-Authorization"] = self.proxyAuth
+            reason = response_status_message(response.status)
+            return self._retry(request, reason, spider)
             
 
 
@@ -282,7 +295,7 @@ class RandomDelayMiddleware:
 
     @classmethod
     def from_crawler(cls, crawler):
-        delay = crawler.spider.settings.get("RANDOM_DELAY", 4)
+        delay = crawler.settings.get("RANDOM_DELAY", 4)
         if not isinstance(delay, int):
             raise ValueError("RANDOM_DELAY need a int")
         
