@@ -182,7 +182,10 @@ class Details:
                 "div#content > h1 >span.year::text"
             ).extract_first()
 
-        return int(float(re.sub("\(|\)", "", text)))
+        if text:
+            text = int(float(re.sub("\(|\)", "", text)))
+        return text
+        
 
 
     @classmethod

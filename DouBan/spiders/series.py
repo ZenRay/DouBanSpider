@@ -297,35 +297,38 @@ class SeriesSpider(scrapy.Spider):
 
         """
         item = DouBanPeopleItem()
-        data = People.extract_bio_informaton(response)
+        try:
+            data = People.extract_bio_informaton(response)
 
-        item["id"] = data.id
-        item["name"] = data.name
-        # 调整性别值为整型数据
-        if data.gender is None:
-            gender = 2
-        elif "男" in data.gender:
-            gender = 1
-        else:
-            gender = 0
+            item["id"] = data.id
+            item["name"] = data.name
+            # 调整性别值为整型数据
+            if data.gender is None:
+                gender = 2
+            elif "男" in data.gender:
+                gender = 1
+            else:
+                gender = 0
 
-        item["gender"] = gender
-        item["constellation"] = data.constellation
-        item["birthdate"] = data.birthdate
-        item["birthplace"] = data.birthplace
-        item["profession"] = data.profession
-        item["alias"] = data.alias
-        item["alias_cn"] = data.alias_cn
-        item["family"] = data.family
-        item["imdb_link"] = data.imdb_link
-        item["official_web"] = data.official_web
-        item["introduction"] = data.introduction
+            item["gender"] = gender
+            item["constellation"] = data.constellation
+            item["birthdate"] = data.birthdate
+            item["birthplace"] = data.birthplace
+            item["profession"] = data.profession
+            item["alias"] = data.alias
+            item["alias_cn"] = data.alias_cn
+            item["family"] = data.family
+            item["imdb_link"] = data.imdb_link
+            item["official_web"] = data.official_web
+            item["introduction"] = data.introduction
 
 
-        # 判断是否有上传图片，如果有图片那么需要请求图片
-        if int(response.css("div#photos > div.hd span > a::text").re("全部(\d+)张")[0]) > 0:
-            url = response.url + "photos/"
-            yield scrapy.Request(url, callback=self.parse_person_imgs, meta={"data": item})
+            # 判断是否有上传图片，如果有图片那么需要请求图片
+            if int(response.css("div#photos > div.hd span > a::text").re("全部(\d+)张")[0]) > 0:
+                url = response.url + "photos/"
+                yield scrapy.Request(url, callback=self.parse_person_imgs, meta={"data": item})
+        except AttributeError as err:
+            self.log(f"请求的 URL 错误: {response.url}", level=logging.ERROR)
 
 
     def parse_person_imgs(self, response):
