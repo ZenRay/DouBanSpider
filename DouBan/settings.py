@@ -22,12 +22,12 @@ NEWSPIDER_MODULE = 'DouBan.spiders'
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 2
+CONCURRENT_REQUESTS = 5
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 16
+DOWNLOAD_DELAY = 3
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN = 16
 #CONCURRENT_REQUESTS_PER_IP = 16
@@ -116,12 +116,15 @@ from os import path
 import time
 LOG_ENABLED = True
 LOG_ENCODING = "utf8"
-LOG_LEVEL = "INFO"
+LOG_LEVEL = "DEBUG"
 LOG_FILE = path.join(path.dirname(__file__), \
     "log/douban_{}.log".format(time.strftime("%Y%m%d", time.localtime())))
 
 # retry
 RETRY_TIMES = 5
+
+# Random Delay
+RANDOM_DELAY = 2
 
 # DataBase configuration
 DATABASE_CONF = {
