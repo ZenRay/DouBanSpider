@@ -405,7 +405,7 @@ class DouBanAwardPipeline(BasePipeline):
             data = DouBanSeriesAwards(**item)
             session.merge(data)
             session.commit()
-            self.logger.info(f"获奖信息写入 awards 完成: {item['sid']}")
+            self.logger.debug(f"获奖信息写入 awards 完成: {item['sid']}")
 
 
 
@@ -425,7 +425,7 @@ class DouBanWorkerPipeline(BasePipeline):
                 
             session.merge(data)
             session.commit()
-            self.logger.info(f"演职人员信息写入 worker 完成: {item['sid']}")
+            self.logger.debug(f"演职人员信息写入 worker 完成: {item['sid']}")
 
 
 
@@ -460,17 +460,17 @@ class DouBanPeoplePipeline(BasePipeline):
         query_item = self.collection.find_one({"id": item['id']})
         if query_item:
             self.collection.update_one({"_id": query_item.get('_id')}, {"$set": dict(item)})
-            self.logger.info(f"更新演职人员数据(MongoDb): {item['id']}")
+            self.logger.debug(f"更新演职人员数据(MongoDb): {item['id']}")
         else:
             self.collection.insert_one(dict(item))
-            self.logger.info(f"插入演职人员数据(MongoDb): {item['id']}")
+            self.logger.debug(f"插入演职人员数据(MongoDb): {item['id']}")
         
         with manipulater.get_session() as session:
             del item['imgs'], item['imgs_content']
             data = DouBanSeriesPerson(**item)
             session.merge(data)
             session.commit()
-            self.logger.info(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
+            self.logger.debug(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
             
 
     def close_spider(self, spider):
@@ -490,7 +490,7 @@ class DouBanPicturePipeline(BasePipeline):
             data = DouBanSeriesPic(**item)
             session.merge(data)
             session.commit()
-            self.logger.info(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
+            self.logger.debug(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
         
 
 
@@ -510,7 +510,7 @@ class DouBanEpisodePipeline(BasePipeline):
             
             session.merge(data)
             session.commit()
-            self.logger.info(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
+            self.logger.debug(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
 
         
 
@@ -543,10 +543,10 @@ class DouBanCommentPipelineM(BasePipeline):
         query_item = self.collection.find_one({"comment_id": item['comment_id']})
         if query_item:
             self.collection.update_one({"_id": query_item.get('_id')}, {"$set": dict(item)})
-            self.logger.info(f"更新评论数据: {item['comment_id']}")
+            self.logger.debug(f"更新评论数据: {item['comment_id']}")
         else:
             self.collection.insert_one(dict(item))
-            self.logger.info(f"插入评论数据: {item['comment_id']}")
+            self.logger.debug(f"插入评论数据: {item['comment_id']}")
         
 
     
