@@ -424,7 +424,7 @@ class DouBanSeriesPerson(Base):
     )
     
     alias = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(160, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(300, convert_unicode=True, collation="utf8mb4_general_ci"),
         default=None, comment='豆瓣影视演职人员姓名(非中文)'
     )
 
@@ -447,7 +447,7 @@ class DouBanSeriesPerson(Base):
     )
 
     introduction = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(3000, collation="utf8mb4_general_ci", convert_unicode=True),
+        sqlalchemy.VARCHAR(4000, collation="utf8mb4_general_ci", convert_unicode=True),
         default=None, comment="人物信息简介"
     )
 
