@@ -7,7 +7,7 @@ import sqlalchemy
 import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import func
-from sqlalchemy.dialects.mysql import INTEGER, YEAR, TINYINT
+from sqlalchemy.dialects.mysql import INTEGER, YEAR, TINYINT, SMALLINT
 from sqlalchemy.orm import relationship, backref
 
 # declarative Base
@@ -129,7 +129,9 @@ class DouBanSeriesInfo(Base):
     language = sqlalchemy.Column(
         sqlalchemy.VARCHAR(100, convert_unicode=True), comment='豆瓣影视语言'
     )
-    release_year = sqlalchemy.Column(YEAR(display_width=4), comment='豆瓣影视成片年份')
+    release_year = sqlalchemy.Column(
+        SMALLINT(4, unsigned=True), default=None, comment='豆瓣影视成片年份'
+    )
     release_date = sqlalchemy.Column(
         sqlalchemy.VARCHAR(100), comment='豆瓣影视上映日期，不同的国家可能日期不同'
     )
@@ -153,7 +155,7 @@ class DouBanSeriesInfo(Base):
         comment='豆瓣影视条目中演员，使用 / 分隔'
     )
     plot = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(3000, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.VARCHAR(6000, collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目剧情简介'
     )
     cover = sqlalchemy.Column(
@@ -416,7 +418,7 @@ class DouBanSeriesPerson(Base):
     )
 
     birthplace = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(30), default=None, comment='影视演职人员出生地'
+        sqlalchemy.VARCHAR(260), default=None, comment='影视演职人员出生地'
     )
 
     profession = sqlalchemy.Column(
@@ -424,7 +426,7 @@ class DouBanSeriesPerson(Base):
     )
     
     alias = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(300, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(1500, convert_unicode=True, collation="utf8mb4_general_ci"),
         default=None, comment='豆瓣影视演职人员姓名(非中文)'
     )
 
@@ -447,7 +449,7 @@ class DouBanSeriesPerson(Base):
     )
 
     introduction = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(4000, collation="utf8mb4_general_ci", convert_unicode=True),
+        sqlalchemy.VARCHAR(6000, collation="utf8mb4_general_ci", convert_unicode=True),
         default=None, comment="人物信息简介"
     )
 
