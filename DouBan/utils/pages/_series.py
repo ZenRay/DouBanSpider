@@ -1,6 +1,7 @@
 #coding:utf8
 from __future__ import absolute_import
 import re
+import logging
 import json
 import datetime
 import requests_html
@@ -52,7 +53,8 @@ class Details:
     __people = namedtuple("worker", ["id", "name"])
     __episode = namedtuple("episode", ["sid", "episode", "title", "origin_title", \
         "date", "plot"])
-
+    # import ipdb; ipdb.set_trace()
+    logger = logging.getLogger(__name__ + ".Details")
     def __init__(self):
         pass
 
@@ -79,13 +81,17 @@ class Details:
         # * 如果 origin_title 不是缺失的情况下，提取出别名，否则直接返回
         if origin_title is None:
             name = response.css("head > title::text") \
-                    .extract_first() \
-                    .replace("(豆瓣)", "") \
+                    .extract_first()
+            
+            # 直接从 meta 中提取信息，提取失败的则直接使用 name
+            if name:
+                name = name.replace("(豆瓣)", "") \
                     .strip()
-            
-            alias = title.replace(name, "").strip()
-            
-            result = cls.__content_name(name=name, alias=alias if alias else None)
+                alias = title.replace(name, "").strip()
+                result = cls.__content_name(name=name, alias=alias if alias else None)
+            else:
+                cls.logger.error(f"Header 解析标题失败: {response.url}")
+                result = cls.__content_name(name=title, alias=None)
         else:
             # 需要确认 origin_title 是否在提取到的标题中，如果不存在则发生值不一致异常
             if origin_title not in title:
@@ -151,9 +157,12 @@ class Details:
         """
         result = response.xpath(
             "//div[@id='info']//span[text()='制片国家/地区:']/following-sibling::text()"
-        ).extract_first().strip()
+        ).extract_first()
+
+        if result:
+            result = result.strip().replace(" / ", "/")
         
-        return  result.replace(" / ", "/")
+        return  result
 
 
     @classmethod
@@ -809,9 +818,12 @@ class Comments:
                 # 如果没有评分值，则返回 None
                 rate = None if not rate else int(float(rate[0].strip())) // 10
                 content = element.css("div.comment > p span.short::text") \
-                        .extract_first().strip()
-                thumb = int(float(element.css("div.comment > h3  span.votes::text") \
-                        .extract_first().strip()))
+                        .extract_first()
+                content = content.strip() if content else None
+
+                thumb = element.css("div.comment > h3  span.votes::text") \
+                        .extract_first()
+                thumb = int(float(thumb.strip())) if thumb else None
                 
 
                 result.append(cls.__short(uname=uname, uid=uid, upic=upic, watched=\
