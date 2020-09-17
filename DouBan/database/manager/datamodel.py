@@ -140,22 +140,22 @@ class DouBanSeriesInfo(Base):
     )
     imdb_id = sqlalchemy.Column(sqlalchemy.VARCHAR(20), comment='IMDB 数据中的 ID')
     tags = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100), comment='豆瓣影视中豆瓣成员常用标签 实际可能为豆瓣处理得到的结果'
+        sqlalchemy.VARCHAR(200), comment='豆瓣影视中豆瓣成员常用标签 实际可能为豆瓣处理得到的结果'
     )
     directors = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100, convert_unicode=True, collation="utf8mb4_general_ci"), \
+        sqlalchemy.VARCHAR(1000, convert_unicode=True, collation="utf8mb4_general_ci"), \
             comment='豆瓣影视条目中导演，使用 / 分隔'
     )
     screenwriters = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.VARCHAR(400, collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目中编剧，使用 / 分隔'
     )
     actors = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(400, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.VARCHAR(1200, collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目中演员，使用 / 分隔'
     )
     plot = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(6000, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.VARCHAR(10000, collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目剧情简介'
     )
     cover = sqlalchemy.Column(
@@ -172,7 +172,7 @@ class DouBanSeriesInfo(Base):
         sqlalchemy.VARCHAR(20), comment='提取豆瓣推荐的类型，解析的内容页面上提供的"好于"类型的信息'
     )
     recommendation_item = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(300, collation="utf8mb4_general_ci", convert_unicode=True), \
+        sqlalchemy.VARCHAR(1200, collation="utf8mb4_general_ci", convert_unicode=True), \
             comment="提取豆瓣对当前内容推荐对相似条目"
     )
 
@@ -436,7 +436,7 @@ class DouBanSeriesPerson(Base):
     )
 
     family = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(200, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(1200, convert_unicode=True, collation="utf8mb4_general_ci"),
         default=None, comment="豆瓣影视演职人员家庭成员"
     )
 
