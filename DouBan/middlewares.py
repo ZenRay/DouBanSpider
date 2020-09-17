@@ -253,6 +253,8 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
             request = request.replace(url=url)
             
             spider.logger.debug(f"触发安全机制，更换请求的 URL: {request.url}")
+            reason = response_status_message(408) 
+            return self._retry(request, reason, spider) or response
         
         exception_link = "https://movie.douban.com/b?r="
         if exception_link in request.url:
@@ -262,6 +264,8 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
             request = request.replace(url=url)
             
             spider.logger.debug(f"触发安全机制，更换请求的 URL: {request.url}")
+            reason = response_status_message(408) 
+            return self._retry(request, reason, spider) or response
             
         if str(response.status).startswith("4"):
             request.meta["proxy"] = self.proxyServer
