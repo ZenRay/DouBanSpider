@@ -87,7 +87,7 @@ class Details:
             if name:
                 name = name.replace("(豆瓣)", "") \
                     .strip()
-                alias = title.replace(name, "").strip()
+                alias = title.replace(name, "").strip() if title else None
                 result = cls.__content_name(name=name, alias=alias if alias else None)
             else:
                 cls.logger.error(f"Header 解析标题失败: {response.url}")
