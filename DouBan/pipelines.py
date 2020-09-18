@@ -375,7 +375,12 @@ class DouBanDetailPipeline(BasePipeline):
         """
         if not isinstance(item, DouBanDetailItem):
             return item
-        
+
+        # 如果 item 中 name 是缺失，那么需要终止处理
+        if item["name"] is None:
+            self.log(f"爬取的页面中没有获取到详情内容: {item['series_id']}", logging.ERROR)
+            return 
+            
         with manipulater.get_session() as session:
             # 根据全局配置参数 update_table 确认是否需要更新
             if spider.config.getboolean("douban_seed", "update_table"):
@@ -384,7 +389,7 @@ class DouBanDetailPipeline(BasePipeline):
                     temp.crawled = True
                     session.merge(temp)
                     session.commit()
-                    self.log(f"Update Seed Status: {temp.series_id}")
+                    self.log(f"Update Seed Status: {temp.series_id}", logging.INFO)
             
             data = DouBanSeriesInfo(**item)
             session.merge(data)
@@ -417,15 +422,14 @@ class DouBanWorkerPipeline(BasePipeline):
             return item
 
         with manipulater.get_session() as session:
-            data = DouBanSeriesWorker(**item)
-            query = session.query(DouBanSeriesWorker).filter_by(sid=item["sid"]).first()
+            query = session.query(DouBanSeriesWorker) \
+                    .filter_by(**item)
 
-            if query:
-                data.wid = query.wid
-                
-            session.merge(data)
-            session.commit()
-            self.logger.debug(f"演职人员信息写入 worker 完成: {item['sid']}")
+            if query.count() == 0:
+                data = DouBanSeriesWorker(**item)
+                session.merge(data)
+                session.commit()
+                self.logger.debug(f"演职人员信息写入 worker 完成: {item['sid']}")
 
 
 
