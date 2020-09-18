@@ -103,6 +103,7 @@ CREATE TABLE `episode_info` (
 -- ----------------------------
 DROP TABLE IF EXISTS `worker`;
 CREATE TABLE `worker` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '仅作为主键字段',
   `wid` varchar(20) NOT NULL COMMENT '豆瓣影视演职人员 ID',
   `name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '豆瓣影视演职人员姓名',
   `alias` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '豆瓣影视演职人员姓名(非中文)', 
@@ -112,7 +113,7 @@ CREATE TABLE `worker` (
   `role` varchar(100) DEFAULT NULL COMMENT '演员或其他配音演员，在影片中的角色',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '首次爬取数据',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新爬取时间，没有更新的情况和首次爬取时间一致',
-  PRIMARY KEY (`wid`),
+  PRIMARY KEY (`id`),
   FOREIGN KEY (`sid`)
     REFERENCES series_info(`series_id`)
     ON UPDATE CASCADE ON DELETE RESTRICT

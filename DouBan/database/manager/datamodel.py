@@ -7,7 +7,7 @@ import sqlalchemy
 import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import func
-from sqlalchemy.dialects.mysql import INTEGER, YEAR, TINYINT, SMALLINT
+from sqlalchemy.dialects.mysql import INTEGER, YEAR, TINYINT, SMALLINT, BIGINT
 from sqlalchemy.orm import relationship, backref
 
 # declarative Base
@@ -272,9 +272,13 @@ class DouBanSeriesWorker(Base):
     __tablename__ = "worker"
     __table_args__ = {"mysql_engine": "InnoDB"}
 
+    id = sqlalchemy.Column(
+        BIGINT(unsigned=True), nullable=False, autoincrement=True, primary_key=True,
+        comment='主键'
+    )
+
     wid = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(20), nullable=False, comment='豆瓣影视演职人员 ID',
-        primary_key=True
+        sqlalchemy.VARCHAR(20), nullable=False, comment='豆瓣影视演职人员 ID'
     )
 
     sid = sqlalchemy.Column(
