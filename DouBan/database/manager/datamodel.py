@@ -109,7 +109,7 @@ class DouBanSeriesInfo(Base):
             collation="utf8mb4_general_ci"), nullable=False, comment="豆瓣影视名称"
     )
     alias = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(length=150, convert_unicode=True, \
+        sqlalchemy.VARCHAR(length=500, convert_unicode=True, \
             collation="utf8mb4_general_ci"), comment="豆瓣影视别名"
     )
     rate = sqlalchemy.Column(sqlalchemy.DECIMAL(2, 1), comment='豆瓣影视评分')
@@ -133,10 +133,10 @@ class DouBanSeriesInfo(Base):
         SMALLINT(4, unsigned=True), default=None, comment='豆瓣影视成片年份'
     )
     release_date = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100), comment='豆瓣影视上映日期，不同的国家可能日期不同'
+        sqlalchemy.VARCHAR(600), comment='豆瓣影视上映日期，不同的国家可能日期不同'
     )
     play_duration = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100), comment='豆瓣影视播放时长，可能不同回家版本存在不同时长'
+        sqlalchemy.VARCHAR(600), comment='豆瓣影视播放时长，可能不同回家版本存在不同时长'
     )
     imdb_id = sqlalchemy.Column(sqlalchemy.VARCHAR(20), comment='IMDB 数据中的 ID')
     tags = sqlalchemy.Column(
@@ -155,7 +155,7 @@ class DouBanSeriesInfo(Base):
         comment='豆瓣影视条目中演员，使用 / 分隔'
     )
     plot = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(10000, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.TEXT(collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目剧情简介'
     )
     cover = sqlalchemy.Column(
