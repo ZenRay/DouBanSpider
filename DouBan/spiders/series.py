@@ -255,7 +255,7 @@ class SeriesSpider(scrapy.Spider):
                     "div.article > div.episode_list > a::attr(href)"
                 ).extract():
                 # 避免存在空字符串
-                if episode_link:
+                if episode_link and not episode_link.startswith("#"):
                     url = f"https://movie.douban.com/{episode_link}"
                     yield scrapy.Request(url, callback=self.parse_episode)
 
