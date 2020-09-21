@@ -1088,8 +1088,14 @@ class People:
         id_ = re.search("celebrity\/(\d{2,})\/", response.url).group(1)
         
         name = response.css("head > title::text") \
-                        .extract_first().replace("(豆瓣)", "") \
+                        .extract_first()
+
+        if name is not None:
+            name = name.replace("(豆瓣)", "") \
                         .strip()
+        else:
+            name = response.xpath("//div[@id='wrapper']//div[@id='fans']") \
+                           .re("(.*)的影迷")[0].strip()
     
         gender = cls.extract_text(response, sub_option=": ", \
             query="//span[text()='性别']/following-sibling::text()")
