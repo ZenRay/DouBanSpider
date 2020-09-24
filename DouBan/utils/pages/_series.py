@@ -5,6 +5,7 @@ import logging
 import json
 import datetime
 import requests_html
+import scrapy
 
 from collections import namedtuple
 from DouBan.utils.exceptions import LostArgument, ValueConsistenceError
@@ -1094,8 +1095,12 @@ class People:
             name = name.replace("(豆瓣)", "") \
                         .strip()
         else:
-            name = response.xpath("//div[@id='wrapper']//div[@id='fans']") \
+            try:
+                name = response.xpath("//div[@id='wrapper']//div[@id='fans']") \
                            .re("(.*)的影迷")[0].strip()
+            except:
+                return scrapy.Request(response.url, \
+                        callback=cls.extract_bio_informaton)
     
         gender = cls.extract_text(response, sub_option=": ", \
             query="//span[text()='性别']/following-sibling::text()")
