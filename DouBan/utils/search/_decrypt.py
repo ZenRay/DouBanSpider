@@ -24,6 +24,14 @@ with open(_encrypt_file, 'r', encoding='utf-8', errors='ignore') as file:
 class Decrypt:
     """
     解密豆瓣响应数据
+
+    提供了两种类方法处理数据，以及一种对象调用方式处理数据，得到的结果都是解密数据:
+
+    Methods:
+    -----------
+    request: 以 URL 方式请求数据解析，默认使用 'GET' 方法，其他请求需要参数以关键字方式调用
+    _decrypt: 对获取到的响应对象，进行解密处理。处理对方式是调用 JS 方法
+    
     """
     def request(self, url, *, method="GET", **kwargs):
         """对 URL 响应结果解密
