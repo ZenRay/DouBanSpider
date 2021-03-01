@@ -108,6 +108,7 @@ class SeriesSpider(scrapy.Spider):
                 seed = seed.first()
 
                 if not self.check_series_id(seed.series_id):
+
                     yield scrapy.Request(url.format(seed=seed.series_id), \
                         callback=self.detail_page)
                     
@@ -118,6 +119,11 @@ class SeriesSpider(scrapy.Spider):
                 
                 # 请求下一个 seed
                 with manipulater.get_session() as session:
+                    # 更新已经爬取的种子状态
+                    seed.crawled = True
+                    session.merge(seed)
+                    session.commit()
+                    # 获取新种子
                     seed = session.query(DouBanSeriesSeed) \
                             .filter(DouBanSeriesSeed.crawled == 0) \
                             .order_by(DouBanSeriesSeed.create_time.desc()) 
@@ -227,6 +233,11 @@ class SeriesSpider(scrapy.Spider):
             )
         else:
             item["recommendation_item"] = None
+        
+        item["set_number"] = response.xpath(
+            "//div[@id='info']//span[@class='pl' and contains(text(), '集数')]/following-sibling::text()"
+        ).extract_first()
+
         yield item
         
         # 如果 item 中的 name 数据是缺失的，不需要在继续解析后面的页面
@@ -356,10 +367,14 @@ class SeriesSpider(scrapy.Spider):
             item["introduction"] = data.introduction
 
 
-            # 判断是否有上传图片，如果有图片那么需要请求图片
+            # 判断是否有上传图片，如果有图片那么需要请求图片，否者直接传递数据
             if int(response.css("div#photos > div.hd span > a::text").re("全部(\d+)张")[0]) > 0:
                 url = response.url + "photos/"
                 yield scrapy.Request(url, callback=self.parse_person_imgs, meta={"data": item})
+            else:
+                item["imgs"] = None
+                item["imgs_content"] = None
+                yield item
         except AttributeError as err:
             self.log(f"Profile 解析错误: {response.url} \n {err}", level=logging.ERROR)
 
@@ -410,6 +425,8 @@ class SeriesSpider(scrapy.Spider):
         elif type_ == "W":
             item["type"] = "壁纸"
             datum, next_ = Pictures.extract_wallpaper_and_series_still(response)
+        else:
+            datum, next_ = [], False
         
         
         # 遍历获取到数据，转换为 Item

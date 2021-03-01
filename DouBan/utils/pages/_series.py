@@ -802,15 +802,30 @@ class Comments:
                 raise ValueConsistenceError(f"can't extract watched information")
 
             for element in elements:
-                uname = element.css("div.avatar > a::attr(title)") \
-                        .extract_first().strip() 
-                uid = element.css("div.avatar > a::attr(href)") \
-                        .extract_first().strip()
-                upic = element.css("div.avatar > a > img::attr(src)") \
-                        .extract_first().strip()
+                try:
+                    uname = element.css("div.avatar > a::attr(title)") \
+                            .extract_first().strip() 
+                except AttributeError as err:
+                    uname = element.css("div.comment > h3 > span.comment-info > a::text") \
+                                .extract_first().strip()
+                try:
+                    uid = element.css("div.avatar > a::attr(href)") \
+                            .extract_first().strip()
+                except AttributeError as err:
+                    uid = element.css("div.comment > h3 > span.comment-info >  a::attr(href)") \
+                                .extract_first().strip()
+
+
+                try:
+                    upic = element.css("div.avatar > a > img::attr(src)") \
+                            .extract_first().strip()
+                except AttributeError as err:
+                    upic = None
+
                 date = element.css(
                         "div.comment span.comment-info > span.comment-time::attr(title)"
                     ).extract_first().strip()
+                    
                 comment_id = element.css("::attr(data-cid)").extract_first().strip()
                 rate = element.css(
                         "div.comment  span.comment-info > span.rating::attr(class)"
