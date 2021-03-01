@@ -244,6 +244,10 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
 
 
     def process_response(self, request, response, spider):
+        # 如果达到最大尝试次数记录异常日志
+        if request.meta.get('retry_times') and request.meta.get('retry_times') == self.max_retry_times:
+            spider.logger.error(f"达到最大尝试次数限制: {response.url}")
+            
         # 需要判断请求 URL 是否正确
         exception_link = "https://sec.douban.com/b?r="
         if exception_link in request.url:

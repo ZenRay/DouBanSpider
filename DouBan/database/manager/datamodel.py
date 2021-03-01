@@ -36,6 +36,7 @@ class DouBanSeriesSeed(Base):
         nullable=True, comment="豆瓣电视剧页面中的 tag，包括 热门,美剧,英剧,韩剧,日剧,国产剧,港剧,日本动画,综艺,纪录片"
     )
     crawled = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False, default=False)
+    priority = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False, default=False)
     create_time = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False, \
         server_default=func.now())
     update_time = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False, \
@@ -157,6 +158,9 @@ class DouBanSeriesInfo(Base):
     plot = sqlalchemy.Column(
         sqlalchemy.TEXT(collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目剧情简介'
+    )
+    set_number = sqlalchemy.Column(
+        sqlalchemy.Integer, nullable=True, default=None, comment='豆瓣影视剧集总集数' 
     )
     cover = sqlalchemy.Column(
         sqlalchemy.VARCHAR(150), comment='豆瓣影视条目中封面海报链接'
@@ -300,7 +304,7 @@ class DouBanSeriesWorker(Base):
     duty = sqlalchemy.Column(sqlalchemy.VARCHAR(100), comment='演职人员岗位')
 
     action = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(5), default=None, comment='演员或其他配音演员，参与到影片中到方式'
+        sqlalchemy.VARCHAR(20), default=None, comment='演员或其他配音演员，参与到影片中到方式'
     )
 
     role = sqlalchemy.Column(
@@ -403,7 +407,7 @@ class DouBanSeriesPerson(Base):
     )
 
     name = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(25, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(200, convert_unicode=True, collation="utf8mb4_general_ci"),
         nullable=False, comment= '豆瓣影视演职人员姓名'
     )
 
@@ -506,7 +510,7 @@ class DouBanSeriesAwards(Base):
     )
 
     name = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(30, collation="utf8mb4_general_ci", convert_unicode=True),
+        sqlalchemy.VARCHAR(130, collation="utf8mb4_general_ci", convert_unicode=True),
         nullable=False, comment='获奖类型名称'
     )
 
