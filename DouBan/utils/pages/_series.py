@@ -1,9 +1,11 @@
 #coding:utf8
 from __future__ import absolute_import
 import re
+import logging
 import json
 import datetime
 import requests_html
+import scrapy
 
 from collections import namedtuple
 from DouBan.utils.exceptions import LostArgument, ValueConsistenceError
@@ -52,7 +54,8 @@ class Details:
     __people = namedtuple("worker", ["id", "name"])
     __episode = namedtuple("episode", ["sid", "episode", "title", "origin_title", \
         "date", "plot"])
-
+    # import ipdb; ipdb.set_trace()
+    logger = logging.getLogger(__name__ + ".Details")
     def __init__(self):
         pass
 
@@ -79,13 +82,17 @@ class Details:
         # * 如果 origin_title 不是缺失的情况下，提取出别名，否则直接返回
         if origin_title is None:
             name = response.css("head > title::text") \
-                    .extract_first() \
-                    .replace("(豆瓣)", "") \
+                    .extract_first()
+            
+            # 直接从 meta 中提取信息，提取失败的则直接使用 name
+            if name:
+                name = name.replace("(豆瓣)", "") \
                     .strip()
-            
-            alias = title.replace(name, "").strip()
-            
-            result = cls.__content_name(name=name, alias=alias if alias else None)
+                alias = title.replace(name, "").strip() if title else None
+                result = cls.__content_name(name=name, alias=alias if alias else None)
+            else:
+                cls.logger.error(f"Header 解析标题失败: {response.url}")
+                result = cls.__content_name(name=title, alias=None)
         else:
             # 需要确认 origin_title 是否在提取到的标题中，如果不存在则发生值不一致异常
             if origin_title not in title:
@@ -151,9 +158,12 @@ class Details:
         """
         result = response.xpath(
             "//div[@id='info']//span[text()='制片国家/地区:']/following-sibling::text()"
-        ).extract_first().strip()
+        ).extract_first()
+
+        if result:
+            result = result.strip().replace(" / ", "/")
         
-        return  result.replace(" / ", "/")
+        return  result
 
 
     @classmethod
@@ -182,7 +192,10 @@ class Details:
                 "div#content > h1 >span.year::text"
             ).extract_first()
 
-        return int(float(re.sub("\(|\)", "", text)))
+        if text:
+            text = int(float(re.sub("\(|\)", "", text)))
+        return text
+        
 
 
     @classmethod
@@ -776,10 +789,10 @@ class Comments:
         elements = response.css(
             "div#wrapper > div#content  div.article div#comments > div.comment-item"
         )
-
+        result = []
+        next_ = False
         # 需要满足超过一个人评论
         if elements and len(elements) > 1:
-            result = []
             # 判断用户是否已经看过影片需要从页面链接中 status 值判断
             if re.search("status=(\w)", response.url).group(1) == "F":
                 watched = False 
@@ -789,15 +802,30 @@ class Comments:
                 raise ValueConsistenceError(f"can't extract watched information")
 
             for element in elements:
-                uname = element.css("div.avatar > a::attr(title)") \
-                        .extract_first().strip() 
-                uid = element.css("div.avatar > a::attr(href)") \
-                        .extract_first().strip()
-                upic = element.css("div.avatar > a > img::attr(src)") \
-                        .extract_first().strip()
+                try:
+                    uname = element.css("div.avatar > a::attr(title)") \
+                            .extract_first().strip() 
+                except AttributeError as err:
+                    uname = element.css("div.comment > h3 > span.comment-info > a::text") \
+                                .extract_first().strip()
+                try:
+                    uid = element.css("div.avatar > a::attr(href)") \
+                            .extract_first().strip()
+                except AttributeError as err:
+                    uid = element.css("div.comment > h3 > span.comment-info >  a::attr(href)") \
+                                .extract_first().strip()
+
+
+                try:
+                    upic = element.css("div.avatar > a > img::attr(src)") \
+                            .extract_first().strip()
+                except AttributeError as err:
+                    upic = None
+
                 date = element.css(
                         "div.comment span.comment-info > span.comment-time::attr(title)"
                     ).extract_first().strip()
+                    
                 comment_id = element.css("::attr(data-cid)").extract_first().strip()
                 rate = element.css(
                         "div.comment  span.comment-info > span.rating::attr(class)"
@@ -806,9 +834,12 @@ class Comments:
                 # 如果没有评分值，则返回 None
                 rate = None if not rate else int(float(rate[0].strip())) // 10
                 content = element.css("div.comment > p span.short::text") \
-                        .extract_first().strip()
-                thumb = int(float(element.css("div.comment > h3  span.votes::text") \
-                        .extract_first().strip()))
+                        .extract_first()
+                content = content.strip() if content else None
+
+                thumb = element.css("div.comment > h3  span.votes::text") \
+                        .extract_first()
+                thumb = int(float(thumb.strip())) if thumb else None
                 
 
                 result.append(cls.__short(uname=uname, uid=uid, upic=upic, watched=\
@@ -822,10 +853,8 @@ class Comments:
             if has_next:
                 next_ = re.sub("^(.*comments).*$", 
                     lambda x: x.group(1) + has_next.strip(), response.url)
-            else:
-                next_ = False
-            
-            return result, next_  
+                
+        return result, next_  
 
 
     @classmethod
@@ -1075,8 +1104,18 @@ class People:
         id_ = re.search("celebrity\/(\d{2,})\/", response.url).group(1)
         
         name = response.css("head > title::text") \
-                        .extract_first().replace("(豆瓣)", "") \
+                        .extract_first()
+
+        if name is not None:
+            name = name.replace("(豆瓣)", "") \
                         .strip()
+        else:
+            try:
+                name = response.xpath("//div[@id='wrapper']//div[@id='fans']") \
+                           .re("(.*)的影迷")[0].strip()
+            except:
+                return scrapy.Request(response.url, \
+                        callback=cls.extract_bio_informaton)
     
         gender = cls.extract_text(response, sub_option=": ", \
             query="//span[text()='性别']/following-sibling::text()")

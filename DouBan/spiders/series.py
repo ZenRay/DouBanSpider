@@ -15,6 +15,7 @@ import string
 import numpy as np
 
 import numbers
+import pymongo
 from os import path, remove
 from pyquery import PyQuery
 from lxml import etree
@@ -23,18 +24,23 @@ from DouBan.items import (
     CoverImageItem, DouBanDetailItem, ListItem, DouBanAwardItem, DouBanWorkerItem,
     DouBanPeopleItem, DouBanPhotosItem, DouBanEpisodeItem, DouBanCommentsItemM
 )
+from DouBan.database.manager.datamodel import DouBanSeriesInfo
+from DouBan.database.manager import DataBaseManipulater
 from DouBan.utils import compress
 from DouBan.settings import DEFAULT_REQUEST_HEADERS as HEADERS
 from DouBan.settings import DATABASE_CONF
 
 from DouBan.utils.exceptions import ConnectionError
 from DouBan.utils.pages import *
+from DouBan.database.conf import configure
 
 from scrapy.exceptions import IgnoreRequest
 
 
 
 logger = logging.getLogger("Douban " + __name__)
+# 表操作对象
+manipulater = DataBaseManipulater(echo=False)
 
 # parse the file, so that check whether the addictive file exits
 global_config = configparser.ConfigParser()
@@ -74,28 +80,53 @@ class SeriesSpider(scrapy.Spider):
         """
         if series:
             for url in series:
-                yield scrapy.Request(url, callback=self.direct_parse_page)
+                if url.startswith("http"):
+                    yield scrapy.Request(url, callback=self.direct_parse_page)
+                # 如果是数字数据，那么直接用于检查该 ID 是否已经写入
+                elif url.isdigit():
+                    url = "https://movie.douban.com/subject/{seed}/"
+                    if not self.check_series_id(url):
+                        yield scrapy.Request(url.format(seed=url), \
+                            callback=self.detail_page)
+
         
 
         # * 需要完成对存储在表中的影视内容进行爬去和解析——用于解析详情内容
         if global_config.getboolean("douban_seed", "check_table"):
             # load 数据管理对象
-            from DouBan.database.manager import DataBaseManipulater
             from DouBan.database.manager.datamodel import DouBanSeriesSeed
-            manipulater = DataBaseManipulater(echo=True)
+            self.database_manipulater = manipulater # 作为数据操作对象传递
             url = "https://movie.douban.com/subject/{seed}/"
             # 从种子数据库中提取未爬取的数据
             with manipulater.get_session() as session:
-                seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0).order_by(DouBanSeriesSeed.create_time.desc())
+                # seeds = session.query(DouBanSeriesSeed).filter(DouBanSeriesSeed.crawled == 0).order_by(DouBanSeriesSeed.create_time.desc())
+                seed = session.query(DouBanSeriesSeed) \
+                    .filter(DouBanSeriesSeed.crawled == 0) \
+                    .order_by(DouBanSeriesSeed.create_time.desc())
+                
+            while seed.count() > 0:
+                seed = seed.first()
 
-                for seed in seeds.all():
+                if not self.check_series_id(seed.series_id):
+
                     yield scrapy.Request(url.format(seed=seed.series_id), \
                         callback=self.detail_page)
                     
                     # 开发阶段只测试一个源
                     if global_config.getboolean("env", "development"):
                         return 
-                    
+                        
+                
+                # 请求下一个 seed
+                with manipulater.get_session() as session:
+                    # 更新已经爬取的种子状态
+                    seed.crawled = True
+                    session.merge(seed)
+                    session.commit()
+                    # 获取新种子
+                    seed = session.query(DouBanSeriesSeed) \
+                            .filter(DouBanSeriesSeed.crawled == 0) \
+                            .order_by(DouBanSeriesSeed.create_time.desc()) 
 
         # * 仅获取到电视剧相关页面的内容保存到数据库以备下一步解析用，不需要进行下一级页面解析
         if global_config.getboolean("douban_seed", "crawl_new"):
@@ -139,6 +170,7 @@ class SeriesSpider(scrapy.Spider):
         """
         处理详情页面的内容
         """
+        self.logger.info(f"爬取影视条目页面: {response.url}")
         item = DouBanDetailItem()
         item["series_id"] = re.search("subject/(\d{3,})", response.url).group(1)
         item["name"] = Details.extract_title(response).name
@@ -201,8 +233,16 @@ class SeriesSpider(scrapy.Spider):
             )
         else:
             item["recommendation_item"] = None
+        
+        item["set_number"] = response.xpath(
+            "//div[@id='info']//span[@class='pl' and contains(text(), '集数')]/following-sibling::text()"
+        ).extract_first()
+
         yield item
         
+        # 如果 item 中的 name 数据是缺失的，不需要在继续解析后面的页面
+        if item['name'] is None:
+            return 
         # 请求获奖详细列表信息
         if response.css("div.mod").re("获奖情况"):
             url = f"https://movie.douban.com/subject/{item['series_id']}/awards/"
@@ -225,16 +265,15 @@ class SeriesSpider(scrapy.Spider):
             for episode_link in response.css(
                     "div.article > div.episode_list > a::attr(href)"
                 ).extract():
-                url = f"https://movie.douban.com/{episode_link}"
-                yield scrapy.Request(url, callback=self.parse_episode)
+                # 避免存在空字符串
+                if episode_link and not episode_link.startswith("#"):
+                    url = f"https://movie.douban.com/{episode_link}"
+                    yield scrapy.Request(url, callback=self.parse_episode)
 
         # 评论内容
         url = f"https://movie.douban.com/subject/{item['series_id']}/"
         for query in ["comments?status=P", "comments?status=F", "reviews"]:
-            if query.startswith("reviews"):
-                yield scrapy.Request(url+query, callback=self.parse_comments)
-            else:
-                yield scrapy.Request(url+query, callback=self.parse_comments)
+            yield scrapy.Request(url+query, callback=self.parse_comments)
 
 
     def parse_awards(self, response):
@@ -281,7 +320,12 @@ class SeriesSpider(scrapy.Spider):
 
             # 请求 profile 页面信息
             if worker.id is not None:
-                yield scrapy.Request(url.format(id=worker.id), callback=self.parse_people)
+                # 去重复筛选
+                collection = configure.parser.get("mongodb", "person_collection")
+                count = self.mongodb_query_count(collection, {"id": worker.id})
+                if count == 0:
+                    yield scrapy.Request(url.format(id=worker.id), \
+                        callback=self.parse_people)
             else:
                 people = DouBanPeopleItem({
                     "id":id, "name": worker.name, "gender": 2
@@ -297,35 +341,42 @@ class SeriesSpider(scrapy.Spider):
 
         """
         item = DouBanPeopleItem()
-        data = People.extract_bio_informaton(response)
+        try:
+            data = People.extract_bio_informaton(response)
 
-        item["id"] = data.id
-        item["name"] = data.name
-        # 调整性别值为整型数据
-        if data.gender is None:
-            gender = 2
-        elif "男" in data.gender:
-            gender = 1
-        else:
-            gender = 0
+            item["id"] = data.id
+            item["name"] = data.name
+            # 调整性别值为整型数据
+            if data.gender is None:
+                gender = 2
+            elif "男" in data.gender:
+                gender = 1
+            else:
+                gender = 0
 
-        item["gender"] = gender
-        item["constellation"] = data.constellation
-        item["birthdate"] = data.birthdate
-        item["birthplace"] = data.birthplace
-        item["profession"] = data.profession
-        item["alias"] = data.alias
-        item["alias_cn"] = data.alias_cn
-        item["family"] = data.family
-        item["imdb_link"] = data.imdb_link
-        item["official_web"] = data.official_web
-        item["introduction"] = data.introduction
+            item["gender"] = gender
+            item["constellation"] = data.constellation
+            item["birthdate"] = data.birthdate
+            item["birthplace"] = data.birthplace
+            item["profession"] = data.profession
+            item["alias"] = data.alias
+            item["alias_cn"] = data.alias_cn
+            item["family"] = data.family
+            item["imdb_link"] = data.imdb_link
+            item["official_web"] = data.official_web
+            item["introduction"] = data.introduction
 
 
-        # 判断是否有上传图片，如果有图片那么需要请求图片
-        if int(response.css("div#photos > div.hd span > a::text").re("全部(\d+)张")[0]) > 0:
-            url = response.url + "photos/"
-            yield scrapy.Request(url, callback=self.parse_person_imgs, meta={"data": item})
+            # 判断是否有上传图片，如果有图片那么需要请求图片，否者直接传递数据
+            if int(response.css("div#photos > div.hd span > a::text").re("全部(\d+)张")[0]) > 0:
+                url = response.url + "photos/"
+                yield scrapy.Request(url, callback=self.parse_person_imgs, meta={"data": item})
+            else:
+                item["imgs"] = None
+                item["imgs_content"] = None
+                yield item
+        except AttributeError as err:
+            self.log(f"Profile 解析错误: {response.url} \n {err}", level=logging.ERROR)
 
 
     def parse_person_imgs(self, response):
@@ -374,6 +425,8 @@ class SeriesSpider(scrapy.Spider):
         elif type_ == "W":
             item["type"] = "壁纸"
             datum, next_ = Pictures.extract_wallpaper_and_series_still(response)
+        else:
+            datum, next_ = [], False
         
         
         # 遍历获取到数据，转换为 Item
@@ -452,3 +505,54 @@ class SeriesSpider(scrapy.Spider):
                 result = base64.b64encode(res.content)
         
         return result
+
+
+    def mongodb_query_count(self, table, query:dict):
+        """MongoDB 查询满足条件的数量
+
+        查询 MongoDB 数据库中数据是否已经存在，collection 是数据库中的文档名称，query 是
+        查询的字典条件, table 对应 mongodb 中的 collection 名称
+        """
+        # 如果没有链接数据库，那么创建链接
+        if not hasattr(self, "database"):
+            self.create_mongo_connection()
+
+        collection = self.database[table]
+        result = collection.find(query).count()
+
+        return result
+
+
+
+    def create_mongo_connection(self):
+        """创建 MongoDB 链接
+        """
+        port = configure.parser.getint("mongodb", "port")
+        host = configure.parser.get("mongodb", "host")
+        tz_aware = configure.parser.getboolean("mongodb", "tz_aware")
+        minPoolSize = configure.parser.getint("mongodb", "minPoolSize")
+        database = configure.parser.get("mongodb", "database")
+        
+
+        self.mongo_client = pymongo.MongoClient(port=port, host=host, \
+            tz_aware=tz_aware, minPoolSize=minPoolSize)
+        self.database = self.mongo_client[database]
+        
+
+
+    def check_series_id(self, id):
+        """检查 ID 
+
+        确认 ID 是否已经在表中
+        """
+        with manipulater.get_session() as session:
+            query = session.query(DouBanSeriesInfo) \
+                                        .filter_by(series_id=id)
+            
+            series_ids_count = query.count()
+            # 如果已经爬取，并且不是通过种子源爬取时，需要更新 seed 中 ID 状态
+            if series_ids_count > 0 and not global_config.getboolean("douban_seed", "check_table"):
+                self.log(f"影视已经爬取过，不再爬取: {id}", logging.DEBUG)
+                return True
+        self.log(f"影视内容尚未爬取: {id}", logging.DEBUG)
+        return False

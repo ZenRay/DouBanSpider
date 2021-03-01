@@ -375,7 +375,12 @@ class DouBanDetailPipeline(BasePipeline):
         """
         if not isinstance(item, DouBanDetailItem):
             return item
-        
+
+        # 如果 item 中 name 是缺失，那么需要终止处理
+        if item["name"] is None:
+            self.log(f"爬取的页面中没有获取到详情内容: {item['series_id']}", logging.ERROR)
+            return 
+            
         with manipulater.get_session() as session:
             # 根据全局配置参数 update_table 确认是否需要更新
             if spider.config.getboolean("douban_seed", "update_table"):
@@ -384,7 +389,7 @@ class DouBanDetailPipeline(BasePipeline):
                     temp.crawled = True
                     session.merge(temp)
                     session.commit()
-                    self.log(f"Update Seed Status: {temp.series_id}")
+                    self.log(f"Update Seed Status: {temp.series_id}", logging.INFO)
             
             data = DouBanSeriesInfo(**item)
             session.merge(data)
@@ -405,7 +410,7 @@ class DouBanAwardPipeline(BasePipeline):
             data = DouBanSeriesAwards(**item)
             session.merge(data)
             session.commit()
-            self.logger.info(f"获奖信息写入 awards 完成: {item['sid']}")
+            self.logger.debug(f"获奖信息写入 awards 完成: {item['sid']}")
 
 
 
@@ -417,15 +422,14 @@ class DouBanWorkerPipeline(BasePipeline):
             return item
 
         with manipulater.get_session() as session:
-            data = DouBanSeriesWorker(**item)
-            query = session.query(DouBanSeriesWorker).filter_by(sid=item["sid"]).first()
+            query = session.query(DouBanSeriesWorker) \
+                    .filter_by(**item)
 
-            if query:
-                data.wid = query.wid
-                
-            session.merge(data)
-            session.commit()
-            self.logger.info(f"演职人员信息写入 worker 完成: {item['sid']}")
+            if query.count() == 0:
+                data = DouBanSeriesWorker(**item)
+                session.merge(data)
+                session.commit()
+                self.logger.debug(f"演职人员信息写入 worker 完成: {item['sid']}")
 
 
 
@@ -460,17 +464,17 @@ class DouBanPeoplePipeline(BasePipeline):
         query_item = self.collection.find_one({"id": item['id']})
         if query_item:
             self.collection.update_one({"_id": query_item.get('_id')}, {"$set": dict(item)})
-            self.logger.info(f"更新演职人员数据(MongoDb): {item['id']}")
+            self.logger.debug(f"更新演职人员数据(MongoDb): {item['id']}")
         else:
             self.collection.insert_one(dict(item))
-            self.logger.info(f"插入演职人员数据(MongoDb): {item['id']}")
+            self.logger.debug(f"插入演职人员数据(MongoDb): {item['id']}")
         
         with manipulater.get_session() as session:
             del item['imgs'], item['imgs_content']
             data = DouBanSeriesPerson(**item)
             session.merge(data)
             session.commit()
-            self.logger.info(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
+            self.logger.debug(f"演职人员 Profile 信息写入 people 完成: {item['id']}")
             
 
     def close_spider(self, spider):
@@ -490,7 +494,7 @@ class DouBanPicturePipeline(BasePipeline):
             data = DouBanSeriesPic(**item)
             session.merge(data)
             session.commit()
-            self.logger.info(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
+            self.logger.debug(f"影视海报等图片信息写入 picture 完成: {item['sid']}")
         
 
 
@@ -510,7 +514,7 @@ class DouBanEpisodePipeline(BasePipeline):
             
             session.merge(data)
             session.commit()
-            self.logger.info(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
+            self.logger.debug(f"影视剧集信息写入 episode_info 完成：{item['sid']}")
 
         
 
@@ -543,10 +547,10 @@ class DouBanCommentPipelineM(BasePipeline):
         query_item = self.collection.find_one({"comment_id": item['comment_id']})
         if query_item:
             self.collection.update_one({"_id": query_item.get('_id')}, {"$set": dict(item)})
-            self.logger.info(f"更新评论数据: {item['comment_id']}")
+            self.logger.debug(f"更新评论数据: {item['comment_id']}")
         else:
             self.collection.insert_one(dict(item))
-            self.logger.info(f"插入评论数据: {item['comment_id']}")
+            self.logger.debug(f"插入评论数据: {item['comment_id']}")
         
 
     

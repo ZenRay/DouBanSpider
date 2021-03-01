@@ -7,7 +7,7 @@ import sqlalchemy
 import datetime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import func
-from sqlalchemy.dialects.mysql import INTEGER, YEAR, TINYINT
+from sqlalchemy.dialects.mysql import INTEGER, YEAR, TINYINT, SMALLINT, BIGINT
 from sqlalchemy.orm import relationship, backref
 
 # declarative Base
@@ -36,6 +36,7 @@ class DouBanSeriesSeed(Base):
         nullable=True, comment="豆瓣电视剧页面中的 tag，包括 热门,美剧,英剧,韩剧,日剧,国产剧,港剧,日本动画,综艺,纪录片"
     )
     crawled = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False, default=False)
+    priority = sqlalchemy.Column(sqlalchemy.Boolean, nullable=False, default=False)
     create_time = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False, \
         server_default=func.now())
     update_time = sqlalchemy.Column(sqlalchemy.DateTime, nullable=False, \
@@ -109,7 +110,7 @@ class DouBanSeriesInfo(Base):
             collation="utf8mb4_general_ci"), nullable=False, comment="豆瓣影视名称"
     )
     alias = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(length=150, convert_unicode=True, \
+        sqlalchemy.VARCHAR(length=500, convert_unicode=True, \
             collation="utf8mb4_general_ci"), comment="豆瓣影视别名"
     )
     rate = sqlalchemy.Column(sqlalchemy.DECIMAL(2, 1), comment='豆瓣影视评分')
@@ -129,32 +130,37 @@ class DouBanSeriesInfo(Base):
     language = sqlalchemy.Column(
         sqlalchemy.VARCHAR(100, convert_unicode=True), comment='豆瓣影视语言'
     )
-    release_year = sqlalchemy.Column(YEAR(display_width=4), comment='豆瓣影视成片年份')
+    release_year = sqlalchemy.Column(
+        SMALLINT(4, unsigned=True), default=None, comment='豆瓣影视成片年份'
+    )
     release_date = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100), comment='豆瓣影视上映日期，不同的国家可能日期不同'
+        sqlalchemy.VARCHAR(600), comment='豆瓣影视上映日期，不同的国家可能日期不同'
     )
     play_duration = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100), comment='豆瓣影视播放时长，可能不同回家版本存在不同时长'
+        sqlalchemy.VARCHAR(600), comment='豆瓣影视播放时长，可能不同回家版本存在不同时长'
     )
     imdb_id = sqlalchemy.Column(sqlalchemy.VARCHAR(20), comment='IMDB 数据中的 ID')
     tags = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100), comment='豆瓣影视中豆瓣成员常用标签 实际可能为豆瓣处理得到的结果'
+        sqlalchemy.VARCHAR(200), comment='豆瓣影视中豆瓣成员常用标签 实际可能为豆瓣处理得到的结果'
     )
     directors = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100, convert_unicode=True, collation="utf8mb4_general_ci"), \
+        sqlalchemy.VARCHAR(1000, convert_unicode=True, collation="utf8mb4_general_ci"), \
             comment='豆瓣影视条目中导演，使用 / 分隔'
     )
     screenwriters = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(100, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.VARCHAR(400, collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目中编剧，使用 / 分隔'
     )
     actors = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(400, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.VARCHAR(1200, collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目中演员，使用 / 分隔'
     )
     plot = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(3000, collation="utf8mb4_general_ci", convert_unicode=True), 
+        sqlalchemy.TEXT(collation="utf8mb4_general_ci", convert_unicode=True), 
         comment='豆瓣影视条目剧情简介'
+    )
+    set_number = sqlalchemy.Column(
+        sqlalchemy.Integer, nullable=True, default=None, comment='豆瓣影视剧集总集数' 
     )
     cover = sqlalchemy.Column(
         sqlalchemy.VARCHAR(150), comment='豆瓣影视条目中封面海报链接'
@@ -170,7 +176,7 @@ class DouBanSeriesInfo(Base):
         sqlalchemy.VARCHAR(20), comment='提取豆瓣推荐的类型，解析的内容页面上提供的"好于"类型的信息'
     )
     recommendation_item = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(300, collation="utf8mb4_general_ci", convert_unicode=True), \
+        sqlalchemy.VARCHAR(1200, collation="utf8mb4_general_ci", convert_unicode=True), \
             comment="提取豆瓣对当前内容推荐对相似条目"
     )
 
@@ -270,9 +276,13 @@ class DouBanSeriesWorker(Base):
     __tablename__ = "worker"
     __table_args__ = {"mysql_engine": "InnoDB"}
 
+    id = sqlalchemy.Column(
+        BIGINT(unsigned=True), nullable=False, autoincrement=True, primary_key=True,
+        comment='主键'
+    )
+
     wid = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(20), nullable=False, comment='豆瓣影视演职人员 ID',
-        primary_key=True
+        sqlalchemy.VARCHAR(20), nullable=False, comment='豆瓣影视演职人员 ID'
     )
 
     sid = sqlalchemy.Column(
@@ -282,7 +292,7 @@ class DouBanSeriesWorker(Base):
     )
     
     name = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(25, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(50, convert_unicode=True, collation="utf8mb4_general_ci"),
         nullable=False, comment='豆瓣影视演职人员姓名'
     )
     
@@ -294,7 +304,7 @@ class DouBanSeriesWorker(Base):
     duty = sqlalchemy.Column(sqlalchemy.VARCHAR(100), comment='演职人员岗位')
 
     action = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(5), default=None, comment='演员或其他配音演员，参与到影片中到方式'
+        sqlalchemy.VARCHAR(20), default=None, comment='演员或其他配音演员，参与到影片中到方式'
     )
 
     role = sqlalchemy.Column(
@@ -397,7 +407,7 @@ class DouBanSeriesPerson(Base):
     )
 
     name = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(25, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(200, convert_unicode=True, collation="utf8mb4_general_ci"),
         nullable=False, comment= '豆瓣影视演职人员姓名'
     )
 
@@ -416,7 +426,7 @@ class DouBanSeriesPerson(Base):
     )
 
     birthplace = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(30), default=None, comment='影视演职人员出生地'
+        sqlalchemy.VARCHAR(260), default=None, comment='影视演职人员出生地'
     )
 
     profession = sqlalchemy.Column(
@@ -424,7 +434,7 @@ class DouBanSeriesPerson(Base):
     )
     
     alias = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(160, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(1500, convert_unicode=True, collation="utf8mb4_general_ci"),
         default=None, comment='豆瓣影视演职人员姓名(非中文)'
     )
 
@@ -434,7 +444,7 @@ class DouBanSeriesPerson(Base):
     )
 
     family = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(200, convert_unicode=True, collation="utf8mb4_general_ci"),
+        sqlalchemy.VARCHAR(1200, convert_unicode=True, collation="utf8mb4_general_ci"),
         default=None, comment="豆瓣影视演职人员家庭成员"
     )
 
@@ -447,7 +457,7 @@ class DouBanSeriesPerson(Base):
     )
 
     introduction = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(3000, collation="utf8mb4_general_ci", convert_unicode=True),
+        sqlalchemy.VARCHAR(6000, collation="utf8mb4_general_ci", convert_unicode=True),
         default=None, comment="人物信息简介"
     )
 
@@ -500,7 +510,7 @@ class DouBanSeriesAwards(Base):
     )
 
     name = sqlalchemy.Column(
-        sqlalchemy.VARCHAR(30, collation="utf8mb4_general_ci", convert_unicode=True),
+        sqlalchemy.VARCHAR(130, collation="utf8mb4_general_ci", convert_unicode=True),
         nullable=False, comment='获奖类型名称'
     )
 

@@ -7,6 +7,7 @@
 import random
 import logging
 import base64
+import urllib
 from scrapy import signals
 
 from DouBan.utils.login import *
@@ -169,7 +170,7 @@ class ABuYunDynamicProxyMiddleware:
     def process_request(self, request, spider):
         request.meta["proxy"] = self.proxyServer
         request.headers["Proxy-Authorization"] = self.proxyAuth
-        spider.logger.info(f"当前页面使用代理服务: {request.url}")
+        spider.logger.debug(f"当前页面使用代理服务: {request.url}")
         
     
 class ABuYunHighQuantityProxyMiddleware:
@@ -184,14 +185,14 @@ class ABuYunHighQuantityProxyMiddleware:
 
     def process_request(self, request, spider):
         if len(self.proxies) == 0:
-            spider.logger.info("代理数量消耗殆尽")
+            spider.logger.debug("代理数量消耗殆尽")
 
         # 随机选择一个代理
         proxy_selected = random.choice(self.proxies)
         proxy = "http://" + proxy_selected
         request.meta["proxy"] = proxy
 
-        spider.logger.info('Use Proxy: ' + proxy)
+        spider.logger.debug('Use Proxy: ' + proxy)
 
 
     def process_response(self, request, response, spider):
@@ -203,7 +204,7 @@ class ABuYunHighQuantityProxyMiddleware:
 
             proxy = data["proxies"]
             request.meta["proxy"] = random.choice(proxy)
-            self.logger.info("Use New Proxy: {}".format(proxy))
+            self.logger.debug("Use New Proxy: {}".format(proxy))
             return request
         return response
 
@@ -238,9 +239,38 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
             bytes((proxyUser + ":" + proxyPass), "ascii")).decode("utf8")
         self.max_retry_times = max_retry_times
         
+        # 添加 priority_adjust 属性才能调整重试策略
+        self.priority_adjust = max_retry_times
 
 
     def process_response(self, request, response, spider):
+        # 如果达到最大尝试次数记录异常日志
+        if request.meta.get('retry_times') and request.meta.get('retry_times') == self.max_retry_times:
+            spider.logger.error(f"达到最大尝试次数限制: {response.url}")
+            
+        # 需要判断请求 URL 是否正确
+        exception_link = "https://sec.douban.com/b?r="
+        if exception_link in request.url:
+            url = request.url.replace(exception_link, "")
+            url = urllib.parse.unquote(url)
+            # 更新 URL
+            request = request.replace(url=url)
+            
+            spider.logger.debug(f"触发安全机制，更换请求的 URL: {request.url}")
+            reason = response_status_message(408) 
+            return self._retry(request, reason, spider) or response
+        
+        exception_link = "https://movie.douban.com/b?r="
+        if exception_link in request.url:
+            url = request.url.replace(exception_link, "")
+            url = urllib.parse.unquote(url)
+            # 更新 URL
+            request = request.replace(url=url)
+            
+            spider.logger.debug(f"触发安全机制，更换请求的 URL: {request.url}")
+            reason = response_status_message(408) 
+            return self._retry(request, reason, spider) or response
+            
         if str(response.status).startswith("4"):
             request.meta["proxy"] = self.proxyServer
 
@@ -248,7 +278,7 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
             reason = response_status_message(response.status)
             return self._retry(request, reason, spider) or response
         elif str(response.status).startswith("3"):
-            spider.logger.info("Acticate Antispider")
+            spider.logger.debug("Acticate Antispider")
 
             request.meta["proxy"] = self.proxyServer
 
@@ -263,11 +293,11 @@ class ABuYunDynamicProxyRetryMiddleware(RetryMiddleware):
         if isinstance(exception, self.EXCEPTIONS_TO_RETRY):
             spider.logger.debug("Catch Exception: {}".format(exception))
             
-            data = request_abuyun(cnt=self.proxy_count)
-            proxy = data["proxies"]
-            request.meta["proxy"] = random.choice(proxy)
+            request.meta["proxy"] = self.proxyServer
 
-            return self._retry(request, exception, spider)
+            request.headers["Proxy-Authorization"] = self.proxyAuth
+            reason = response_status_message(response.status)
+            return self._retry(request, reason, spider)
             
 
 
@@ -282,7 +312,7 @@ class RandomDelayMiddleware:
 
     @classmethod
     def from_crawler(cls, crawler):
-        delay = crawler.spider.settings.get("RANDOM_DELAY", 4)
+        delay = crawler.settings.get("RANDOM_DELAY", 4)
         if not isinstance(delay, int):
             raise ValueError("RANDOM_DELAY need a int")
         
@@ -290,7 +320,7 @@ class RandomDelayMiddleware:
 
     def process_request(self, request, spider):
         delay = random.randint(1, self.delay)
-        spider.logger.info("{name} Delay: {time}s".format(
+        spider.logger.debug("{name} Delay: {time}s".format(
             name=spider.name, time=delay))
         time.sleep(delay)
 

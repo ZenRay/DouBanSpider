@@ -44,7 +44,9 @@ class DataBaseManipulater(object):
         """
         # create table, pass `checkfirst=True`, so that enforce check existence 
         # before create table
-        self._engine = sqlalchemy.create_engine(URI, echo=kwargs.get("echo", False))
+        pool_size = int(configure.mysql.get("pool_size"))
+        self._engine = sqlalchemy.create_engine(URI, echo=kwargs.get("echo", False), 
+            pool_size=kwargs.get("pool_size", pool_size))
         Base.metadata.create_all(self._engine, checkfirst=True)
 
 

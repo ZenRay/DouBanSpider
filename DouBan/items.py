@@ -43,6 +43,7 @@ class DouBanDetailItem(scrapy.Item):
     screenwriters = scrapy.Field() # 豆瓣影视条目中编剧，使用 / 分隔
     actors = scrapy.Field() # 豆瓣影视条目中演员，使用 / 分隔
     plot = scrapy.Field()   # 豆瓣影视条目剧情简介
+    set_number = scrapy.Field() # 豆瓣影视剧集总集数
     cover = scrapy.Field()  # 豆瓣影视条目中封面海报链接
     cover_content = scrapy.Field()  # 豆瓣影视海报链接请求后的 content，避免后续无法请求的情况
     official_site = scrapy.Field()  # 影视条目上的官方网站
