@@ -11,7 +11,7 @@ from pypinyin import Style, pinyin
 import urllib3
 from requests import exceptions
 
-__all__ = ["extract1st_char"]
+__all__ = ["extract1st_char", "_url_valid"]
 
 
 def extract1st_char(string):
