@@ -10,7 +10,7 @@ import re
 from pypinyin import Style, pinyin
 
 
-__all__ = ["extract1st_char"]
+__all__ = ["extract1st_char", "_url_valid"]
 
 
 def extract1st_char(string):
